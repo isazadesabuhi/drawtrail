@@ -69,8 +69,8 @@ export default function Home() {
               </div>
               <h3>A sketch. Then the streets.</h3>
               <p>
-                Your map workspace is ready. Choose a start in Lyon, then come
-                back for the drawing canvas in the next chapter.
+                Choose a start in Lyon, then make your mark with the drawing
+                canvas, presets, or a simple SVG. Street routing comes next.
               </p>
               <div className="milestone">
                 <span className="milestone-check" aria-hidden="true">

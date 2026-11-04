@@ -2,7 +2,7 @@
 
 A local-first GPS art app: turn a simple drawing into a connected walking, running, or cycling route on real streets.
 
-This checkout includes the foundation and **Phase 02: map workspace**. At `/workspace`, explore Lyon, search a small local place catalog, and choose a start point by clicking, dragging a pin, or entering coordinates. Drawing, routing, and exports are later milestones. The homepage artwork is an illustration, not a real route.
+This checkout includes **Phase 03: drawing and image inputs**, alongside the Lyon map workspace. At `/workspace`, choose a starting location, then select **Draw your idea** for freehand/keyboard drawing, presets, SVG import, raster previews, silhouette tracing, transforms, stroke ordering, undo/redo, and local draft saving. Geographic placement, routing and exports are later milestones. Drawings and the homepage artwork are target art, not navigable routes.
 
 ## Requirements
 
@@ -64,7 +64,9 @@ CI installs Playwright's matching Chromium automatically. Local browser checks u
 
 No variables are required for Gate A. `apps/web/.env.example` documents the optional future `VALHALLA_URL`; copy it to `apps/web/.env.local` when needed. The startup validator rejects invalid HTTP(S) URLs without printing their contents. Routing code must call the validator with `requireRouter = true` so missing configuration fails explicitly. Never prefix routing credentials with `NEXT_PUBLIC_` or import server configuration into browser components.
 
-Interactive development uses attributed OSM standard tiles by default. Production requires `NEXT_PUBLIC_MAP_STYLE_URL` and `NEXT_PUBLIC_MAP_ATTRIBUTION`; without them, coordinate selection still works and the map shows a configuration message. See [map development](docs/development/maps.md) for provider setup, service usage limits, search abstraction, coordinate conventions, and fixture-based tests. The start point stays in editor state while editing; saving across reloads comes in Phase 03.
+Interactive development uses attributed OSM standard tiles by default. Production requires `NEXT_PUBLIC_MAP_STYLE_URL` and `NEXT_PUBLIC_MAP_ATTRIBUTION`; without them, coordinate selection still works and the map shows a configuration message. See [map development](docs/development/maps.md) for provider setup, service usage limits, search abstraction, coordinate conventions, and fixture-based tests. The start point stays in editor state while switching stages; map locations reset on reload.
+
+Drawing drafts now survive reloads on the same browser/device. The map location and uploaded image files are not persisted. See [drawing inputs](docs/algorithm/drawing-inputs.md) for supported SVG geometry, file/model limits, keyboard shortcuts, stroke semantics, tracing limitations and privacy. PNG/JPEG import initially provides a preview; only an explicitly reviewed outline replaces the drawing.
 
 ## Layout
 

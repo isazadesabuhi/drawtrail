@@ -27,7 +27,7 @@ Map loading, tile/style errors, missing WebGL, and timeouts offer coordinate fal
 
 The form labels latitude then longitude for humans. Model values use WGS84/GeoJSON `[longitude, latitude]`; the selected-point card shows both representations. Global finite/range checks and a separate Lyon-area check reject invalid/swapped local coordinates. The bounded test area is longitude 4.65–5.02, latitude 45.63–45.90. These bounds are editor scope, not a routing data guarantee.
 
-Map clicks, marker drags, manual entry, and local search update one React editor state. Resetting the viewport does not move the selected point. Invalid drags return to the last valid position. Reload persistence belongs to task 03-11 and is not implemented here.
+Map clicks, marker drags, manual entry, and local search update one React editor state. Resetting the viewport does not move the selected point. Invalid drags return to the last valid position. The point survives switching between place/drawing stages. Task 03-11 now persists the drawing only; map locations remain transient and reset on reload.
 
 ## Search providers
 

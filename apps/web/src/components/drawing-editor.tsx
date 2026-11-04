@@ -1,0 +1,634 @@
+'use client';
+
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ChangeEvent,
+} from 'react';
+import Image from 'next/image';
+import type { Drawing, DrawingStroke } from '@drawtrail/types';
+import {
+  changeDrawing,
+  drawingPreset,
+  emptyDrawing,
+  redoDrawing,
+  resampleStroke,
+  simplifyStroke,
+  transformDrawing,
+  undoDrawing,
+  type DrawingHistory,
+  type DrawingTransform,
+  type PresetName,
+} from '@drawtrail/geo-utils';
+import { drawingSchema } from '@drawtrail/validation';
+import { readDrawingDraft, writeDrawingDraft } from '../lib/drawing-draft';
+import { importSvg, MAX_SVG_BYTES } from '../lib/svg-import';
+import {
+  loadRaster,
+  traceRaster,
+  type RasterPreview,
+} from '../lib/raster-import';
+import { DrawingCanvas, DrawingLines } from './drawing-canvas';
+
+const subscribe = () => () => {};
+const clientSnapshot = () => true;
+const serverSnapshot = () => false;
+const presets: readonly PresetName[] = [
+  'heart',
+  'circle',
+  'square',
+  'star',
+  'letter',
+];
+
+export function DrawingEditor() {
+  const hydrated = useSyncExternalStore(
+    subscribe,
+    clientSnapshot,
+    serverSnapshot,
+  );
+  return hydrated ? (
+    <DrawingSession />
+  ) : (
+    <p role="status">Preparing your drawing canvas…</p>
+  );
+}
+
+function loadInitialDraft() {
+  try {
+    return readDrawingDraft(window.localStorage);
+  } catch {
+    return {
+      drawing: emptyDrawing(),
+      selectedStrokeId: null,
+      notice: 'Local storage is unavailable. You can still draw.',
+    };
+  }
+}
+
+function DrawingSession() {
+  const [initial] = useState(loadInitialDraft);
+  const [history, setHistory] = useState<DrawingHistory>(() => ({
+    past: [],
+    present: initial.drawing,
+    future: [],
+  }));
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initial.selectedStrokeId,
+  );
+  const [feedback, setFeedback] = useState({
+    error: false,
+    text: initial.notice,
+  });
+  const [saveStatus, setSaveStatus] = useState('Saving…');
+  const [raster, setRaster] = useState<RasterPreview | null>(null);
+  const [candidate, setCandidate] = useState<Drawing | null>(null);
+  const [busy, setBusy] = useState(false);
+  const uploadTicket = useRef(0);
+  const rasterRef = useRef<RasterPreview | null>(null);
+  const drawing = history.present;
+  const selected =
+    drawing.strokes.find((stroke) => stroke.id === selectedId) ??
+    drawing.strokes[0] ??
+    null;
+
+  useEffect(() => {
+    const persist = () => {
+      try {
+        writeDrawingDraft(window.localStorage, drawing, selected?.id ?? null);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const timer = window.setTimeout(
+      () =>
+        setSaveStatus(
+          persist() ? 'Saved on this device' : 'Local saving unavailable',
+        ),
+      350,
+    );
+    const flush = () => {
+      persist();
+    };
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('pagehide', flush);
+      persist();
+    };
+  }, [drawing, selected?.id]);
+
+  useEffect(
+    () => () => {
+      uploadTicket.current++;
+      if (rasterRef.current) URL.revokeObjectURL(rasterRef.current.url);
+    },
+    [],
+  );
+
+  function commit(next: Drawing, message = 'Drawing updated.') {
+    const parsed = drawingSchema.safeParse(next);
+    if (!parsed.success) {
+      setFeedback({
+        error: true,
+        text:
+          parsed.error.issues[0]?.message ??
+          'The drawing is invalid or too detailed.',
+      });
+      return;
+    }
+    setHistory((previous) => changeDrawing(previous, parsed.data));
+    setSaveStatus('Saving…');
+    setFeedback({ error: false, text: message });
+  }
+  function undo() {
+    setHistory(undoDrawing);
+    setSaveStatus('Saving…');
+    setFeedback({ error: false, text: 'Undid the last change.' });
+  }
+  function redo() {
+    setHistory(redoDrawing);
+    setSaveStatus('Saving…');
+    setFeedback({ error: false, text: 'Redid the last change.' });
+  }
+  function addStroke(stroke: DrawingStroke) {
+    commit(
+      { ...drawing, source: 'freehand', strokes: [...drawing.strokes, stroke] },
+      'Stroke added. Separate strokes have no connecting line.',
+    );
+    setSelectedId(stroke.id);
+  }
+  function transform(options: DrawingTransform) {
+    try {
+      commit(transformDrawing(drawing, options));
+    } catch (error) {
+      setFeedback({ error: true, text: (error as Error).message });
+    }
+  }
+  function replaceSelected(update: (stroke: DrawingStroke) => DrawingStroke) {
+    if (!selected) return;
+    try {
+      commit({
+        ...drawing,
+        strokes: drawing.strokes.map((stroke) =>
+          stroke.id === selected.id ? update(stroke) : stroke,
+        ),
+      });
+    } catch (error) {
+      setFeedback({ error: true, text: (error as Error).message });
+    }
+  }
+  function reorder(index: number, offset: number) {
+    const strokes = [...drawing.strokes],
+      to = index + offset;
+    if (to < 0 || to >= strokes.length) return;
+    [strokes[index], strokes[to]] = [strokes[to]!, strokes[index]!];
+    commit(
+      { ...drawing, strokes },
+      'Stroke order updated. No connectors were added.',
+    );
+  }
+  function releasePreview() {
+    if (rasterRef.current) URL.revokeObjectURL(rasterRef.current.url);
+    rasterRef.current = null;
+    setRaster(null);
+    setCandidate(null);
+  }
+  async function upload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const ticket = ++uploadTicket.current;
+    setBusy(true);
+    setCandidate(null);
+    try {
+      if (/\.svg$/i.test(file.name) || file.type === 'image/svg+xml') {
+        if (file.size > MAX_SVG_BYTES)
+          throw new Error('SVG must be 256 KB or smaller.');
+        const next = importSvg(await file.text());
+        if (ticket !== uploadTicket.current) return;
+        releasePreview();
+        commit(next, 'SVG imported as separate editable strokes.');
+        setSelectedId(next.strokes[0]?.id ?? null);
+      } else {
+        const preview = await loadRaster(file);
+        if (ticket !== uploadTicket.current) {
+          URL.revokeObjectURL(preview.url);
+          return;
+        }
+        releasePreview();
+        rasterRef.current = preview;
+        setRaster(preview);
+        setFeedback({
+          error: false,
+          text: 'Image preview loaded. Your drawing is unchanged; trace and review a silhouette before using it.',
+        });
+      }
+    } catch (error) {
+      if (ticket === uploadTicket.current)
+        setFeedback({ error: true, text: (error as Error).message });
+    } finally {
+      if (ticket === uploadTicket.current) setBusy(false);
+    }
+  }
+  const transforms: { label: string; options: DrawingTransform }[] = [
+    { label: 'Move left', options: { dx: -0.04 } },
+    { label: 'Move right', options: { dx: 0.04 } },
+    { label: 'Move up', options: { dy: -0.04 } },
+    { label: 'Move down', options: { dy: 0.04 } },
+    { label: 'Rotate left', options: { degrees: -15 } },
+    { label: 'Rotate right', options: { degrees: 15 } },
+    { label: 'Make smaller', options: { scale: 0.85 } },
+    { label: 'Make larger', options: { scale: 1.15 } },
+    { label: 'Flip horizontally', options: { flipX: true } },
+    { label: 'Flip vertically', options: { flipY: true } },
+  ];
+
+  return (
+    <section
+      className="drawing-editor"
+      aria-labelledby="drawing-title"
+      onKeyDown={(event) => {
+        if (
+          !(event.ctrlKey || event.metaKey) ||
+          (event.target instanceof HTMLElement &&
+            ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName))
+        )
+          return;
+        if (event.key.toLowerCase() === 'z') {
+          event.preventDefault();
+          if (event.shiftKey) redo();
+          else undo();
+        }
+        if (event.key.toLowerCase() === 'y') {
+          event.preventDefault();
+          redo();
+        }
+      }}
+    >
+      <div className="drawing-editor-heading">
+        <div>
+          <p className="eyebrow">A SHAPE ONLY YOU COULD MAKE</p>
+          <h2 id="drawing-title">Make your mark.</h2>
+          <p>Keep it simple. A few good lines can go a long way.</p>
+        </div>
+        <output
+          className="draft-status"
+          role="status"
+          aria-label="Draft storage"
+        >
+          {saveStatus}
+        </output>
+      </div>
+      <div className="drawing-editor-grid">
+        <aside className="drawing-tools" aria-label="Drawing tools">
+          <section className="drawing-tool-card">
+            <h3>Start with a little inspiration</h3>
+            <div className="preset-buttons">
+              {presets.map((name) => (
+                <button
+                  type="button"
+                  key={name}
+                  onClick={() => {
+                    const preset = drawingPreset(name);
+                    commit(preset, `${preset.name} preset loaded.`);
+                    setSelectedId(preset.strokes[0]!.id);
+                  }}
+                >
+                  <svg viewBox="0 0 1 1" aria-hidden="true">
+                    <DrawingLines drawing={drawingPreset(name)} />
+                  </svg>
+                  <span>
+                    {name === 'letter'
+                      ? 'Letter M'
+                      : name[0]!.toUpperCase() + name.slice(1)}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="field-hint">
+              Presets replace the current drawing. Undo brings it back.
+            </p>
+          </section>
+          <details className="drawing-tool-card" open>
+            <summary>Move & shape</summary>
+            <div className="transform-buttons">
+              {transforms.map(({ label, options }) => (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  key={label}
+                  disabled={!drawing.strokes.length}
+                  onClick={() => transform(options)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="field-hint">
+              Moves: 4% · turns: 15°. Geometry stays inside the canvas.
+            </p>
+          </details>
+          <details className="drawing-tool-card" open>
+            <summary>Import a shape or image</summary>
+            <label className="upload-label" htmlFor="drawing-upload">
+              Choose SVG, PNG or JPEG
+            </label>
+            <input
+              id="drawing-upload"
+              type="file"
+              accept=".svg,image/svg+xml,image/png,image/jpeg"
+              onChange={upload}
+              disabled={busy}
+            />
+            <p className="field-hint">
+              SVG: up to 256 KB, basic geometry only. PNG/JPEG: up to 5 MB and 4
+              megapixels.
+            </p>
+            {busy && <p role="status">Reading your file…</p>}
+            {raster && (
+              <div className="raster-preview">
+                <Image
+                  unoptimized
+                  src={raster.url}
+                  width={raster.width}
+                  height={raster.height}
+                  alt="Uploaded image preview"
+                />
+                <p>
+                  Image preview · {raster.width} × {raster.height}
+                </p>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => {
+                    try {
+                      setCandidate(traceRaster(raster));
+                      setFeedback({
+                        error: false,
+                        text: 'Review the outline, then choose whether to use it.',
+                      });
+                    } catch (error) {
+                      setCandidate(null);
+                      setFeedback({
+                        error: true,
+                        text: (error as Error).message,
+                      });
+                    }
+                  }}
+                >
+                  Trace silhouette
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={releasePreview}
+                >
+                  Remove image preview
+                </button>
+              </div>
+            )}
+            {candidate && (
+              <div className="trace-review">
+                <h4>Review extracted outline</h4>
+                <svg
+                  viewBox="0 0 1 1"
+                  role="img"
+                  aria-label="Extracted silhouette outline"
+                >
+                  <DrawingLines drawing={candidate} />
+                </svg>
+                <p className="field-hint">
+                  Experimental: one solid dark shape, no holes or separate
+                  contours.
+                </p>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => {
+                    commit(
+                      candidate,
+                      'Reviewed silhouette added as an editable outline.',
+                    );
+                    setSelectedId(candidate.strokes[0]!.id);
+                    setCandidate(null);
+                  }}
+                >
+                  Replace drawing with outline
+                </button>
+              </div>
+            )}
+          </details>
+        </aside>
+        <div className="drawing-paper-panel">
+          <div className="drawing-toolbar">
+            <strong>Drawing canvas</strong>
+            <div>
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={!history.past.length}
+                onClick={undo}
+              >
+                Undo
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={!history.future.length}
+                onClick={redo}
+              >
+                Redo
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={!drawing.strokes.length}
+                onClick={() =>
+                  commit(
+                    emptyDrawing(),
+                    'Drawing cleared. Undo can restore it.',
+                  )
+                }
+              >
+                Clear drawing
+              </button>
+            </div>
+          </div>
+          <DrawingCanvas
+            drawing={drawing}
+            selectedId={selected?.id ?? null}
+            onStroke={addStroke}
+            onMessage={(text) => setFeedback({ error: false, text })}
+          />
+          {feedback.text && (
+            <p
+              className={
+                feedback.error
+                  ? 'drawing-feedback field-error'
+                  : 'drawing-feedback'
+              }
+              role={feedback.error ? 'alert' : 'status'}
+              aria-label="Drawing feedback"
+            >
+              {feedback.text}
+            </p>
+          )}
+          <section
+            className="stroke-panel"
+            aria-labelledby="stroke-panel-title"
+          >
+            <div className="stroke-panel-heading">
+              <h3 id="stroke-panel-title">Your strokes</h3>
+              <output aria-label="Stroke count">
+                {drawing.strokes.length}{' '}
+                {drawing.strokes.length === 1 ? 'stroke' : 'strokes'}
+              </output>
+            </div>
+            {drawing.strokes.length > 1 && (
+              <p className="multi-stroke-notice">
+                These are separate strokes, in the order below. No connecting
+                lines are added. Select one stroke to use alone for the first
+                routing baseline.
+              </p>
+            )}
+            {!drawing.strokes.length ? (
+              <p className="field-hint">
+                Draw with a pointer, use the keyboard, import an SVG, or choose
+                a preset.
+              </p>
+            ) : (
+              <ol className="stroke-list">
+                {drawing.strokes.map((stroke, index) => (
+                  <li key={stroke.id}>
+                    <button
+                      className={
+                        stroke.id === selected?.id
+                          ? 'stroke-select active'
+                          : 'stroke-select'
+                      }
+                      aria-pressed={stroke.id === selected?.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedId(stroke.id);
+                        setSaveStatus('Saving…');
+                      }}
+                    >
+                      {index + 1}. {stroke.label} ·{' '}
+                      {stroke.closed ? 'closed' : 'open'} ·{' '}
+                      {stroke.points.length} points
+                    </button>
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      aria-label={`Move stroke ${index + 1} earlier`}
+                      disabled={index === 0}
+                      onClick={() => reorder(index, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      aria-label={`Move stroke ${index + 1} later`}
+                      disabled={index === drawing.strokes.length - 1}
+                      onClick={() => reorder(index, 1)}
+                    >
+                      ↓
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {selected && (
+              <div className="stroke-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={drawing.strokes.length < 2}
+                  onClick={() =>
+                    commit(
+                      { ...drawing, strokes: [selected] },
+                      'Kept only the selected stroke. Undo can restore the others.',
+                    )
+                  }
+                >
+                  Use only selected stroke
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() =>
+                    replaceSelected((stroke) => ({
+                      ...stroke,
+                      points: [...stroke.points].reverse(),
+                    }))
+                  }
+                >
+                  Reverse selected stroke
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() =>
+                    replaceSelected((stroke) => ({
+                      ...stroke,
+                      closed: !stroke.closed,
+                      points: stroke.closed
+                        ? stroke.points.slice(0, -1)
+                        : [...stroke.points, stroke.points[0]!],
+                    }))
+                  }
+                >
+                  {selected.closed
+                    ? 'Open selected stroke'
+                    : 'Close selected stroke'}
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() =>
+                    replaceSelected((stroke) => ({
+                      ...stroke,
+                      points: resampleStroke(
+                        simplifyStroke(stroke.points, 0.003, stroke.closed),
+                        0.025,
+                      ),
+                    }))
+                  }
+                >
+                  Simplify & resample
+                </button>
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() =>
+                    commit(
+                      {
+                        ...drawing,
+                        strokes: drawing.strokes.filter(
+                          (stroke) => stroke.id !== selected.id,
+                        ),
+                      },
+                      'Selected stroke removed.',
+                    )
+                  }
+                >
+                  Delete selected stroke
+                </button>
+              </div>
+            )}
+          </section>
+          <p className="drawing-privacy-note">
+            Only your drawing and stroke selection are saved on this device. Map
+            location and source image files are not stored. Geographic placement
+            and real street routing come next.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "Letter M",
+  "source": "preset",
+  "strokes": [
+    {
+      "id": "preset-letter",
+      "label": "Stroke 1",
+      "closed": false,
+      "points": [
+        [0.12, 0.88],
+        [0.12, 0.12],
+        [0.5, 0.576],
+        [0.88, 0.12],
+        [0.88, 0.88]
+      ]
+    }
+  ]
+}

@@ -11,6 +11,9 @@
 * {
   box-sizing: border-box;
 }
+[hidden] {
+  display: none !important;
+}
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 24px;
@@ -604,6 +607,18 @@ footer p {
   font-size: 13px;
   line-height: 1.7;
 }
+.editor-heading-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+.editor-heading-actions .primary-button {
+  white-space: nowrap;
+  gap: 18px;
+  padding: 13px 17px;
+  font-size: 12px;
+}
 .editor-region {
   white-space: nowrap;
   font-size: 12px;
@@ -641,6 +656,414 @@ footer p {
 .editor-steps .current-step {
   color: var(--green);
   font-weight: 600;
+}
+.editor-steps li > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.editor-steps li > button > span {
+  font-family: Georgia, serif;
+  font-size: 16px;
+  font-style: italic;
+}
+
+.drawing-editor-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin: 5px 0 24px;
+}
+.drawing-editor-heading .eyebrow {
+  margin-bottom: 9px;
+}
+.drawing-editor-heading h2 {
+  font-size: 34px;
+}
+.drawing-editor-heading p:last-child {
+  font-size: 12px;
+  color: #718168;
+  line-height: 1.7;
+  margin: 9px 0 0;
+}
+.draft-status {
+  color: #60794f;
+  font-size: 10px;
+  white-space: nowrap;
+  border: 1px solid #dce4d2;
+  padding: 9px 12px;
+  border-radius: 20px;
+}
+.drawing-editor-grid {
+  display: grid;
+  grid-template-columns: 285px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.drawing-tools {
+  display: grid;
+  gap: 15px;
+  min-width: 0;
+}
+.drawing-tool-card {
+  padding: 19px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefb;
+  min-width: 0;
+}
+.drawing-tool-card h3,
+.drawing-tool-card summary {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  margin: 0 0 14px;
+}
+.drawing-tool-card summary {
+  cursor: pointer;
+  line-height: 1.6;
+}
+.drawing-tool-card:not([open]) summary {
+  margin: 0;
+}
+.preset-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+.preset-buttons button {
+  min-width: 0;
+  padding: 8px 5px;
+  border: 1px solid #dce2d2;
+  border-radius: 5px;
+  background: #f7f8f0;
+  color: #496744;
+  cursor: pointer;
+}
+.preset-buttons button:hover {
+  background: #e9efdc;
+}
+.preset-buttons svg {
+  display: block;
+  width: 35px;
+  height: 35px;
+  margin: auto auto 6px;
+}
+.preset-buttons span {
+  font-size: 10px;
+}
+.transform-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.transform-buttons button {
+  padding: 9px 5px;
+  font-size: 10px;
+}
+.drawing-tools input[type='file'] {
+  max-width: 100%;
+  width: 100%;
+  font-size: 10px;
+  color: #738267;
+}
+.drawing-tools input[type='file']::file-selector-button {
+  border: 1px solid #cedbbd;
+  background: #edf2e3;
+  color: #3f633d;
+  padding: 10px;
+  border-radius: 5px;
+  font-size: 11px;
+  cursor: pointer;
+  margin: 0 6px 7px 0;
+}
+.upload-label {
+  display: block;
+  font-size: 11px;
+  margin-bottom: 9px;
+  color: #556f4b;
+}
+.drawing-paper-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fffefb;
+  min-width: 0;
+}
+.drawing-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 17px;
+  border-bottom: 1px solid var(--line);
+}
+.drawing-toolbar strong {
+  font-size: 12px;
+}
+.drawing-toolbar > div {
+  display: flex;
+  gap: 6px;
+}
+.drawing-toolbar button {
+  min-height: 34px;
+  padding: 8px 10px;
+  font-size: 10px;
+}
+.canvas-instructions {
+  font-size: 10px;
+  line-height: 1.7;
+  color: #7b866e;
+  margin: 13px 18px;
+}
+.drawing-canvas {
+  display: block;
+  width: min(calc(100% - 36px), 520px);
+  aspect-ratio: 1;
+  margin: 16px auto;
+  border: 1px solid #d9e0ce;
+  border-radius: 7px;
+  background-color: #fbfbf4;
+  background-image: radial-gradient(#d7ddc9 1px, transparent 1px);
+  background-size: 22px 22px;
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+}
+.drawing-canvas:focus-visible {
+  outline-offset: 4px;
+}
+.drawing-stroke {
+  stroke: #dc8457;
+  stroke-width: 2.6px;
+}
+.selected-stroke {
+  stroke: #375d47;
+  stroke-width: 3px;
+}
+.live-stroke {
+  stroke: #e67c4e;
+  stroke-width: 3px;
+}
+.drawing-cursor {
+  stroke: #bd6e43;
+  fill: #edc49d;
+  fill-opacity: 0.6;
+  stroke-width: 1px;
+}
+.drawing-placeholder {
+  font-family: Georgia, serif;
+  font-size: 0.042px;
+  font-style: italic;
+  fill: #a5ae94;
+  pointer-events: none;
+}
+.drawing-canvas-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  background: #f2f5e9;
+  font-size: 10px;
+  color: #728366;
+  line-height: 1.6;
+}
+.drawing-feedback {
+  padding: 0 18px;
+  font-size: 11px;
+  color: #5b7a4b;
+  line-height: 1.7;
+}
+.drawing-feedback.field-error {
+  color: #a34a2b;
+}
+.stroke-panel {
+  border-top: 1px solid var(--line);
+  padding: 18px;
+}
+.stroke-panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+}
+.stroke-panel-heading h3 {
+  font-size: 14px;
+  margin: 0;
+}
+.stroke-panel-heading output {
+  font-size: 10px;
+  color: #849074;
+}
+.stroke-list {
+  padding: 0;
+  margin: 13px 0;
+  list-style: none;
+  display: grid;
+  gap: 7px;
+}
+.stroke-list li {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+.stroke-select {
+  flex: 1;
+  min-width: 0;
+  padding: 10px;
+  text-align: left;
+  border: 1px solid #e0e5d6;
+  background: #f9faf3;
+  color: #6a7c5d;
+  border-radius: 5px;
+  font-size: 11px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.stroke-select.active {
+  border-color: #90a577;
+  background: #edf3e3;
+  color: #3f6339;
+}
+.stroke-list .secondary-button {
+  padding: 8px;
+  min-width: 32px;
+}
+.stroke-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.stroke-actions .secondary-button {
+  font-size: 10px;
+}
+.multi-stroke-notice {
+  font-size: 11px;
+  color: #8b683f;
+  line-height: 1.7;
+  padding: 10px;
+  background: #fbf3e7;
+  border-radius: 5px;
+}
+.drawing-privacy-note {
+  border-top: 1px solid var(--line);
+  color: #89947c;
+  font-size: 10px;
+  line-height: 1.8;
+  padding: 15px 18px;
+  margin: 0;
+}
+.raster-preview {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+.raster-preview img {
+  width: 100%;
+  max-height: 210px;
+  height: auto;
+  object-fit: contain;
+  border: 1px solid #e0e5d5;
+  border-radius: 5px;
+  background: white;
+}
+.raster-preview p {
+  margin: 0;
+  font-size: 10px;
+  color: #7b886e;
+}
+.trace-review {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 13px;
+}
+.trace-review h4 {
+  font-weight: 500;
+  font-size: 12px;
+  margin: 0 0 10px;
+}
+.trace-review svg {
+  width: 100%;
+  aspect-ratio: 1;
+  max-height: 180px;
+  background: #f5f7ed;
+  border: 1px solid #dfe5d3;
+}
+.trace-review .primary-button {
+  margin-top: 10px;
+  padding: 12px;
+  width: 100%;
+  font-size: 10px;
+}
+@media (max-width: 760px) {
+  .drawing-editor-heading {
+    align-items: flex-start;
+    margin-bottom: 16px;
+  }
+  .drawing-editor-heading h2 {
+    font-size: 28px;
+  }
+  .drawing-editor-heading .eyebrow {
+    font-size: 8px;
+    letter-spacing: 1.2px;
+  }
+  .draft-status {
+    font-size: 9px;
+    padding: 8px;
+    white-space: normal;
+    max-width: 92px;
+    line-height: 1.6;
+  }
+  .drawing-editor-grid {
+    display: flex;
+    flex-direction: column;
+  }
+  .drawing-paper-panel {
+    width: 100%;
+    order: -1;
+  }
+  .drawing-tools {
+    width: 100%;
+  }
+  .drawing-toolbar {
+    padding: 12px;
+    gap: 7px;
+    flex-wrap: wrap;
+  }
+  .drawing-toolbar button {
+    padding: 8px;
+  }
+  .canvas-instructions {
+    margin: 12px;
+  }
+  .drawing-canvas {
+    width: calc(100% - 26px);
+  }
+  .drawing-canvas-footer {
+    padding: 10px 12px;
+    font-size: 9px;
+  }
+  .stroke-panel {
+    padding: 14px 12px;
+  }
+  .preset-buttons {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .preset-buttons svg {
+    width: 32px;
+    height: 32px;
+  }
+  .drawing-privacy-note {
+    padding: 12px;
+  }
 }
 .editor-grid {
   display: grid;
@@ -1020,6 +1443,15 @@ footer p {
   }
   .editor-heading {
     display: block;
+  }
+  .editor-heading-actions {
+    align-items: flex-start;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    margin-top: 18px;
+  }
+  .editor-heading-actions .primary-button {
+    padding: 11px 14px;
   }
   .editor-heading h1 {
     max-width: 400px;

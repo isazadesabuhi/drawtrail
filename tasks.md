@@ -195,73 +195,73 @@
 
 ## Phase 03 — Drawing and image inputs (P0)
 
-### [ ] 03-01 — Define canonical drawing model
+### [x] 03-01 — Define canonical drawing model
 
 **Scope:** Represent ordered strokes, open/closed status, normalized coordinates and metadata.
 
 **Acceptance:** Zod schema validates fixtures.
 
-### [ ] 03-02 — Implement freehand drawing canvas
+### [x] 03-02 — Implement freehand drawing canvas
 
 **Scope:** Draw strokes by mouse and touch with visible pointer feedback.
 
 **Acceptance:** Strokes stored in canonical model.
 
-### [ ] 03-03 — Add undo/redo and clear
+### [x] 03-03 — Add undo/redo and clear
 
 **Scope:** Implement history changes for canvas edits.
 
 **Acceptance:** Undo/redo works for multiple strokes.
 
-### [ ] 03-04 — Add shape presets
+### [x] 03-04 — Add shape presets
 
 **Scope:** Provide heart, circle, square, star and simple single-stroke letter.
 
 **Acceptance:** Presets create deterministic strokes.
 
-### [ ] 03-05 — Support SVG upload
+### [x] 03-05 — Support SVG upload
 
 **Scope:** Safely parse limited path geometry; reject scripts/external references.
 
 **Acceptance:** Allowed SVG loads; malicious/invalid SVG rejected.
 
-### [ ] 03-06 — Support raster image upload preview
+### [x] 03-06 — Support raster image upload preview
 
 **Scope:** Accept limited PNG/JPEG with size limits and client preview, without pretending it is route-ready.
 
 **Acceptance:** Preview and error feedback work.
 
-### [ ] 03-07 — Implement silhouette extraction prototype
+### [x] 03-07 — Implement silhouette extraction prototype
 
 **Scope:** Convert high-contrast raster to ordered contour; document limitations.
 
 **Acceptance:** Fixture PNG produces ordered outline within tolerance.
 
-### [ ] 03-08 — Handle multi-stroke images explicitly
+### [x] 03-08 — Handle multi-stroke images explicitly
 
 **Scope:** Expose stroke ordering/selection; reject unsupported complex tracing with clear message.
 
 **Acceptance:** No silent joining of separate strokes.
 
-### [ ] 03-09 — Add stroke simplification and resampling
+### [x] 03-09 — Add stroke simplification and resampling
 
 **Scope:** Implement RDP-like simplification and arc-length resampling; preserve closure.
 
 **Acceptance:** Tests cover corners, zero-length and loops.
 
-### [ ] 03-10 — Add drawing manipulation
+### [x] 03-10 — Add drawing manipulation
 
 **Scope:** Move, rotate, flip and scale shape within editor.
 
 **Acceptance:** Model updates and preview reflects changes.
 
-### [ ] 03-11 — Persist draft locally
+### [x] 03-11 — Persist draft locally
 
 **Scope:** Store nonsensitive editor draft in browser with schema version.
 
 **Acceptance:** Reload restores draft; corrupt draft resets safely.
 
-### [ ] 03-12 — Test accessibility and touch input
+### [x] 03-12 — Test accessibility and touch input
 
 **Scope:** Cover controls, keyboard alternatives and touch gestures.
 
@@ -972,18 +972,18 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 | 02-06 | done   | 02-04                        | Cancellable provider interface, local catalog, disabled-provider and coordinate fallback tests pass.                                                  |
 | 02-07 | done   | 02-06                        | Click, drag, manual and place selection update one editor state; coordinate order/invalid drag tested.                                                |
 | 02-08 | done   | 02-03, 02-05, 02-07          | 44 unit/component tests and 6 desktop/mobile E2E tests pass; failures/retry covered with fixtures.                                                    |
-| 03-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 03-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 03-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 03-04 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 03-05 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 03-06 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 03-07 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 03-08 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 03-09 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 03-10 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 03-11 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 03-12 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
+| 03-01 | done   | 02-07                        | Drawing/ordered stroke types and bounded versioned Zod schemas; all fixed preset fixtures validate.                                                   |
+| 03-02 | done   | 03-01                        | SVG canvas records normalized mouse/touch strokes with cursor feedback; real browser journeys pass.                                                   |
+| 03-03 | done   | 03-02                        | 50-snapshot undo/redo and clear; multiple-stroke, branching and clear/restore tests pass.                                                             |
+| 03-04 | done   | 03-03                        | Deterministic heart, circle, square, star and single-stroke M; fixed JSON fixtures match.                                                             |
+| 03-05 | done   | 03-04                        | Detached bounded SVG geometry parser; accepted curves/primitives and malicious/unsupported rejection tests pass.                                      |
+| 03-06 | done   | 03-05                        | PNG/JPEG header, byte and pixel limits plus transient previews; real browser PNG/JPEG decoding verified.                                              |
+| 03-07 | done   | 03-06                        | Single connected contour prototype; fixed PNG yields ordered closed outline at expected normalized bounds.                                            |
+| 03-08 | done   | 03-07                        | Explicit ordered stroke list, selection/reorder/reverse/keep-one; no silent connectors; complex contours rejected.                                    |
+| 03-09 | done   | 03-08                        | Iterative RDP and arc-length sampling retain corners/closure; zero-length and loop fixtures tested.                                                   |
+| 03-10 | done   | 03-09                        | Whole-drawing move, rotate, flip, scale; out-of-bounds changes fail without clipping; undo restores geometry.                                         |
+| 03-11 | done   | 03-10                        | Versioned drawing-only local drafts survive reload; corruption, schema mismatch and storage denial tested.                                            |
+| 03-12 | done   | 03-11                        | Keyboard drawing and real emulated touch journeys pass in desktop/mobile browser suites without overflow.                                             |
 | 04-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
 | 04-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
 | 04-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
@@ -1100,3 +1100,5 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 - 2026-11-04: Phase 02 completed with local checks (44 unit/component tests, 6 desktop/mobile browser tests); details in docs/progress/phase-02.md. Normal production build restored after fixture-based browser tests. No task definitions or IDs changed; Phase 03 is next.
 
 - 2026-11-04: Added task 01-12 for the observed local development startup failure. Existing IDs and acceptance criteria are unchanged. Tailwind/PostCSS updated together, dev mode uses Webpack, and CI now exercises development browser journeys. See docs/progress/dev-startup-fix.md.
+
+- 2026-11-04: Phase 03 implemented and verified locally: 99 unit/component tests, 16 development and 16 production browser checks. See docs/progress/phase-03.md and docs/algorithm/drawing-inputs.md for limits and evidence. Drawing drafts exclude map location/image files. No task IDs or acceptance criteria changed; Phase 04 is next.
