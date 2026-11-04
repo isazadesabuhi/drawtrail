@@ -313,55 +313,55 @@
 
 ## Phase 05 — Local routing infrastructure (P0)
 
-### [ ] 05-01 — Add Docker Compose for Valhalla
+### [x] 05-01 — Add Docker Compose for Valhalla
 
 **Scope:** Create optional local Valhalla service and persistent tile volume; pin tested image version.
 
 **Acceptance:** Service boots via documented command.
 
-### [ ] 05-02 — Document regional OSM extract acquisition
+### [x] 05-02 — Document regional OSM extract acquisition
 
 **Scope:** Use small fixture region first, then Lyon/Rhône extract if suitable; note disk/RAM and license.
 
 **Acceptance:** No large PBF committed; setup repeatable.
 
-### [ ] 05-03 — Create routing-service health check
+### [x] 05-03 — Create routing-service health check
 
 **Scope:** Wait for loaded graph and check a valid pedestrian route, not just a running container.
 
 **Acceptance:** Health fails when tiles absent and succeeds after load.
 
-### [ ] 05-04 — Build typed Valhalla client
+### [x] 05-04 — Build typed Valhalla client
 
 **Scope:** Create server-only client with timeout, cancellation and bounded retries.
 
 **Acceptance:** Fixture request decodes geometry and distance.
 
-### [ ] 05-05 — Implement pedestrian route request
+### [x] 05-05 — Implement pedestrian route request
 
 **Scope:** Use walking costing and verify legal access using engine results.
 
 **Acceptance:** Known walkable fixture returns path.
 
-### [ ] 05-06 — Implement cycling route request
+### [x] 05-06 — Implement cycling route request
 
 **Scope:** Use bicycle costing and mode-specific restrictions.
 
 **Acceptance:** Cycling example differs from walking where network requires.
 
-### [ ] 05-07 — Implement running profile baseline
+### [x] 05-07 — Implement running profile baseline
 
 **Scope:** Treat running as pedestrian routing with configurable preferences, not invented distinct Valhalla profile.
 
 **Acceptance:** Request and documentation state assumption.
 
-### [ ] 05-08 — Normalize routing errors
+### [x] 05-08 — Normalize routing errors
 
 **Scope:** Handle no-route, timeouts, invalid waypoints, missing region and engine down.
 
 **Acceptance:** Typed error contract tested.
 
-### [ ] 05-09 — Add routing fixtures and integration smoke test
+### [x] 05-09 — Add routing fixtures and integration smoke test
 
 **Scope:** Check simple A-to-B, disconnected endpoints and invalid coordinates.
 
@@ -991,15 +991,15 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 | 04-05 | done   | 04-04                        | Typed errors cover invalid geometry; self-crossings remain informational warnings, including the figure-eight fixture.                                   |
 | 04-06 | done   | 04-05                        | Separate GeoJSON target and actual-route sources/layers use distinct colors and a visible target/route legend; route remains empty until routing exists. |
 | 04-07 | done   | 04-06                        | Canonical heart/circle/letter/open-stroke/figure-eight SVG and JSON fixtures pass unit validation and browser import journeys.                           |
-| 05-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 05-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 05-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 05-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 05-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 05-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 05-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 05-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 05-09 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 05-01 | done   | See phase dependencies above | Compose service started successfully with the pinned image and persistent graph volume.                                                                  |
+| 05-02 | done   | See phase dependencies above | Andorra/Rhône-Alpes setup, storage, and ODbL guidance documented.                                                                                        |
+| 05-03 | done   | See phase dependencies above | Route-aware health passed after graph load; pedestrian fixture returned 1.17 km.                                                                         |
+| 05-04 | done   | See phase dependencies above | Typed client decodes fixture routes; timeout, cancellation, retries tested.                                                                              |
+| 05-05 | done   | See phase dependencies above | Pedestrian costing and access-aware fixture route tested; local route passed.                                                                            |
+| 05-06 | done   | See phase dependencies above | Local cycling route returned 1.43 km and differed from walking.                                                                                          |
+| 05-07 | done   | See phase dependencies above | Running maps to pedestrian costing with optional speed.                                                                                                  |
+| 05-08 | done   | See phase dependencies above | Typed route failures covered by fixture tests.                                                                                                           |
+| 05-09 | done   | See phase dependencies above | Live A-to-B, disconnected endpoint, and invalid-coordinate smoke passed.                                                                                 |
 | 06-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
 | 06-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
 | 06-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |

@@ -2,13 +2,13 @@
 
 A local-first GPS art app: turn a simple drawing into a connected walking, running, or cycling route on real streets.
 
-This checkout includes **Phase 04: geographic drawing placement** alongside the Lyon map workspace. At `/workspace`, choose a starting location, then draw or import a shape, try deterministic nearby placements, and preview the target geometry on the map. The map keeps the target drawing separate from the future street-route overlay. Street-network routing and exports are later milestones. Drawings and the homepage artwork are target art, not navigable routes.
+This checkout includes **Phase 05: local routing foundations** alongside the Lyon map workspace. At `/workspace`, choose a starting location, then draw or import a shape, try deterministic nearby placements, and preview the target geometry on the map. An optional local Valhalla service can return real pedestrian and bicycle routes; the web client keeps target art separate from router-validated street geometry. Full drawing-to-route generation and exports are later milestones. Drawings and the homepage artwork are target art, not navigable routes.
 
 ## Requirements
 
 - Node.js 24 LTS recommended (minimum configured: 22.13).
 - pnpm 11.25.0, recorded in `package.json`.
-- Docker Desktop with WSL2 on Windows only when the routing phase begins; no Docker, credentials, database, or paid service is needed for this scaffold.
+- Docker Desktop with WSL2 on Windows is optional for the web workspace and required to run local routing. No credentials, database, or paid service is needed.
 
 ## Start locally
 
@@ -70,6 +70,8 @@ Drawing drafts now survive reloads on the same browser/device. The map location 
 
 Geographic placement uses a local East/North metric projection and deterministic candidate generation. See [geographic placement](docs/algorithm/geographic-placement.md) for projection limits, footprint semantics, validation warnings and overlay colors.
 
+To run routing locally, start Docker Desktop, then run `pnpm routing:up` and `pnpm routing:health`. The initial Valhalla graph uses Andorra as a small test region and is stored in a persistent Docker volume. Routing setup, larger Lyon/Rhône extracts, disk/RAM guidance, OSM licensing, and opt-in integration tests are documented in [local routing](docs/development/routing.md). Stop the service with `pnpm routing:down`; the graph volume remains available for the next start.
+
 ## Layout
 
 ```text
@@ -78,6 +80,7 @@ packages/types/           Browser-safe public contracts
 packages/validation/      Zod schemas
 packages/geo-utils/       Lyon center, editor bounds, and boundary helpers
 packages/api-client/      Versioned client foundation
+apps/web/src/lib/         Server-only Valhalla route client and typed errors
 docs/product/             Scope and user journeys
 docs/algorithm/           Metrics and quality gates
 docs/adr/                 Architecture decisions

@@ -1,0 +1,32 @@
+services:
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:3.9.1
+    ports:
+      - '${VALHALLA_PORT:-8002}:8002'
+    environment:
+      tile_urls: ${VALHALLA_TILE_URL:-https://download.geofabrik.de/europe/andorra-latest.osm.pbf}
+      server_threads: ${VALHALLA_SERVER_THREADS:-2}
+      build_admins: 'True'
+      build_time_zones: 'False'
+      build_transit: 'False'
+      build_elevation: 'False'
+      build_tar: 'True'
+      serve_tiles: 'True'
+      tileset_name: valhalla_tiles
+    volumes:
+      - valhalla_tiles:/custom_files
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl --globoff --fail --silent --show-error
+          'http://127.0.0.1:8002/route?json={"locations":[{"lat":42.5063,"lon":1.5218},{"lat":42.5092,"lon":1.5342}],"costing":"pedestrian","units":"kilometers"}'
+          > /dev/null
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15m
+
+volumes:
+  valhalla_tiles:
