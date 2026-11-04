@@ -8,10 +8,11 @@
     "start": "next start"
   },
   "dependencies": {
+    "@drawtrail/api-client": "*",
+    "@drawtrail/geo-utils": "*",
     "@drawtrail/types": "*",
     "@drawtrail/validation": "*",
-    "@drawtrail/geo-utils": "*",
-    "@drawtrail/api-client": "*",
+    "maplibre-gl": "6.16.0",
     "next": "16.2.10",
     "react": "19.2.7",
     "react-dom": "19.2.7",

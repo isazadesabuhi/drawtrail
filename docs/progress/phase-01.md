@@ -1,6 +1,6 @@
 # Phase 01 verification — 2026-11-04
 
-Phase 00 is complete. Phase 01 is implemented and verified locally. Task 01-10 remains in review until a real GitHub Actions run can be observed; no Git repository or remote is connected to this directory. Phase 02 is not started.
+Phase 00 is complete. Phase 01 was implemented and verified locally. Task 01-10 remains in review until a real GitHub Actions run can be observed. A Git repository and remote were connected after this report's initial verification; the later Phase 02 results are recorded separately in `phase-02.md`.
 
 ## Deliverables
 

@@ -13,6 +13,7 @@
   "scripts": {
     "dev": "npm run dev --workspace=@drawtrail/web --",
     "build": "npm run build --workspace=@drawtrail/web",
+    "build:e2e": "node tools/build-e2e.mjs",
     "start": "npm run start --workspace=@drawtrail/web",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",

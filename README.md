@@ -2,7 +2,7 @@
 
 A local-first GPS art app: turn a simple drawing into a connected walking, running, or cycling route on real streets.
 
-This checkout implements **Gate A: foundation**. It includes a responsive Next.js home screen, accessible activity selection, shared TypeScript packages, environment validation, and test/build tooling. The map, drawing editor, routing, and exports are subsequent milestones. The homepage artwork is an illustration, not a real route.
+This checkout includes the foundation and **Phase 02: map workspace**. At `/workspace`, explore Lyon, search a small local place catalog, and choose a start point by clicking, dragging a pin, or entering coordinates. Drawing, routing, and exports are later milestones. The homepage artwork is an illustration, not a real route.
 
 ## Requirements
 
@@ -17,7 +17,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open <http://localhost:3000>. Stop the server with Ctrl+C.
+Open <http://localhost:3000> or go directly to <http://localhost:3000/workspace>. Stop the server with Ctrl+C.
 
 On Windows, use `pnpm.cmd` if PowerShell blocks `.ps1` launchers. If pnpm is not installed, `npm.cmd install --global pnpm@11.25.0` installs it in an ordinary unrestricted development session. Do not change system execution policy for this app.
 
@@ -39,15 +39,17 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm exec playwright install chromium
+pnpm build:e2e
 pnpm test:e2e
 ```
 
-Each script can also be run with `npm.cmd run <script>`. `npm.cmd test` runs the unit/component suite; `npx.cmd playwright install chromium` installs the browser when network access is available. E2E runs both desktop and phone viewports against the production build, so run `pnpm build` first. Playwright starts and stops its own production server. `pnpm start` serves the same completed build interactively.
+Each script can also be run with `npm.cmd run <script>`. `npm.cmd test` runs the unit/component suite; `npx.cmd playwright install chromium` installs the browser when network access is available. Run `pnpm build:e2e` before browser tests so they use synthetic fixture geometry instead of live public tiles. Playwright starts and stops its own production server. Rebuild with ordinary `pnpm build` afterward for normal production use; `pnpm start` serves that completed build.
 
 If Chromium download is unavailable, set `PLAYWRIGHT_EXECUTABLE_PATH` to an installed Chrome/Chromium executable for local testing. In Windows PowerShell, for example:
 
 ```powershell
 $env:PLAYWRIGHT_EXECUTABLE_PATH = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+npm.cmd run build:e2e
 npm.cmd run test:e2e
 ```
 
@@ -57,13 +59,15 @@ CI installs Playwright's matching Chromium automatically. Local browser checks u
 
 No variables are required for Gate A. `apps/web/.env.example` documents the optional future `VALHALLA_URL`; copy it to `apps/web/.env.local` when needed. The startup validator rejects invalid HTTP(S) URLs without printing their contents. Routing code must call the validator with `requireRouter = true` so missing configuration fails explicitly. Never prefix routing credentials with `NEXT_PUBLIC_` or import server configuration into browser components.
 
+Interactive development uses attributed OSM standard tiles by default. Production requires `NEXT_PUBLIC_MAP_STYLE_URL` and `NEXT_PUBLIC_MAP_ATTRIBUTION`; without them, coordinate selection still works and the map shows a configuration message. See [map development](docs/development/maps.md) for provider setup, service usage limits, search abstraction, coordinate conventions, and fixture-based tests. The start point stays in editor state while editing; saving across reloads comes in Phase 03.
+
 ## Layout
 
 ```text
 apps/web/                 Next.js App Router + Tailwind
 packages/types/           Browser-safe public contracts
 packages/validation/      Zod schemas
-packages/geo-utils/       Geographic helpers (Lyon center initially)
+packages/geo-utils/       Lyon center, editor bounds, and boundary helpers
 packages/api-client/      Versioned client foundation
 docs/product/             Scope and user journeys
 docs/algorithm/           Metrics and quality gates
@@ -80,6 +84,6 @@ The future worker and Expo app are intentionally deferred to their backlog phase
 - If package downloads fail, the environment may restrict network access. Offline installation needs complete metadata and tarballs, plus a writable cache. Do not treat a failed install as a passing check.
 - If browser tests report a missing executable, install Playwright Chromium once. A system browser can be used for local QA via a separate explicit configuration; CI installs the matching browser.
 - Use either native Windows or WSL consistently for dependencies; do not share `node_modules` between them. Use Docker's WSL2 backend for the later routing service and keep large OSM data out of source control.
-- Public map tile hosting and attribution are separate from routing infrastructure. No tile service is contacted by the scaffold.
+- Public map tile hosting and attribution are separate from routing infrastructure. If tiles fail, use coordinate entry or retry; the selected start point is kept. The tests use local fixtures and never require live public tiles.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [tasks.md](tasks.md) for acceptance and reporting rules. The scaffold follows the [Next.js installation guidance](https://nextjs.org/docs/app/getting-started/installation); lint runs separately from the build.

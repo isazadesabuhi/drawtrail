@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ActivityPicker } from '../components/activity-picker';
 import { TrailIllustration } from '../components/trail-illustration';
+import { SiteHeader } from '../components/site-header';
 
 export default function Home() {
   return (
@@ -8,26 +9,7 @@ export default function Home() {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <header className="site-header">
-        <Link className="brand" href="/" aria-label="DrawTrail home">
-          <span className="brand-symbol" aria-hidden="true">
-            ↝
-          </span>
-          drawtrail<span className="brand-dot">.</span>
-        </Link>
-        <nav aria-label="Main navigation">
-          <a className="nav-active" href="#workspace">
-            Workspace
-          </a>
-          <a href="#how-it-works">
-            How it works <span aria-hidden="true">↗</span>
-          </a>
-        </nav>
-        <span className="local-badge">
-          <span />
-          Local-first, open roads
-        </span>
-      </header>
+      <SiteHeader />
       <main id="main">
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-copy">
@@ -49,9 +31,9 @@ export default function Home() {
               A heart through your neighborhood. A star across the city. Turn
               the things you draw into places you go.
             </p>
-            <a className="primary-button" href="#workspace">
+            <Link className="primary-button" href="/workspace">
               Meet your workspace <span aria-hidden="true">↗</span>
-            </a>
+            </Link>
             <div className="hero-footnote">
               <span className="mini-spark" aria-hidden="true">
                 ✳
@@ -87,8 +69,8 @@ export default function Home() {
               </div>
               <h3>A sketch. Then the streets.</h3>
               <p>
-                The foundation is ready. Next up: a drawing canvas and a map
-                centered on Lyon, France.
+                Your map workspace is ready. Choose a start in Lyon, then come
+                back for the drawing canvas in the next chapter.
               </p>
               <div className="milestone">
                 <span className="milestone-check" aria-hidden="true">

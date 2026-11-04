@@ -1,9 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { mockMapStyle } from './map-fixture';
 
 test('homepage loads, activity selection works, and the viewport does not overflow', async ({
   page,
 }, testInfo) => {
   const errors: string[] = [];
+  await mockMapStyle(page);
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   await expect(
@@ -13,7 +15,6 @@ test('homepage loads, activity selection works, and the viewport does not overfl
     path: testInfo.outputPath('homepage.png'),
     fullPage: true,
   });
-  await page.getByRole('link', { name: 'Meet your workspace' }).click();
   await page.getByRole('radio', { name: 'Run', exact: true }).check();
   await expect(page.getByRole('status')).toContainText('running loop');
   await page.getByRole('radio', { name: 'Run', exact: true }).focus();
@@ -31,4 +32,8 @@ test('homepage loads, activity selection works, and the viewport does not overfl
     ),
   ).toBe(true);
   expect(errors).toEqual([]);
+  await page.getByRole('link', { name: 'Meet your workspace' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Find your little corner of Lyon.' }),
+  ).toBeVisible();
 });
