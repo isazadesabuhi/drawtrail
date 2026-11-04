@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+
+linkWorkspacePackages: true
+preferWorkspacePackages: true
+
+allowBuilds:
+  esbuild: true
+  sharp: false
+  unrs-resolver: false

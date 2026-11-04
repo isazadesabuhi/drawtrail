@@ -1,0 +1,24 @@
+{
+  "name": "@drawtrail/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@drawtrail/types": "*",
+    "@drawtrail/validation": "*",
+    "@drawtrail/geo-utils": "*",
+    "@drawtrail/api-client": "*",
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.2.2",
+    "tailwindcss": "4.2.2"
+  }
+}

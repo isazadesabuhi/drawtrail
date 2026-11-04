@@ -1,0 +1,42 @@
+{
+  "name": "drawtrail",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@drawtrail/web --",
+    "build": "npm run build --workspace=@drawtrail/web",
+    "start": "npm run start --workspace=@drawtrail/web",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check:docs": "node tools/check-backlog.mjs",
+    "typecheck": "tsc -p packages/types && tsc -p packages/validation && tsc -p packages/geo-utils && tsc -p packages/api-client && tsc -p apps/web && tsc -p tsconfig.tools.json",
+    "test": "vitest run --configLoader runner",
+    "test:e2e": "playwright test",
+    "check": "npm run check:docs && npm run format:check && npm run lint && npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.10",
+    "jsdom": "29.0.1",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "4.1.2"
+  }
+}
