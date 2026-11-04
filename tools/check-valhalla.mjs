@@ -4,20 +4,29 @@ import { setTimeout as sleep } from 'node:timers/promises';
 const baseUrl = new URL(process.env.VALHALLA_URL ?? 'http://127.0.0.1:8002');
 const shouldWait = process.argv.includes('--wait');
 const deadline = Date.now() + (shouldWait ? 15 * 60_000 : 5_000);
-const fixtures = {
-  pedestrian: {
+const fixtures = [
+  {
+    name: 'Lyon',
+    locations: [
+      { lat: 45.764, lon: 4.8357 },
+      { lat: 45.768, lon: 4.841 },
+    ],
+  },
+  {
+    name: 'Andorra',
     locations: [
       { lat: 42.5063, lon: 1.5218 },
       { lat: 42.5092, lon: 1.5342 },
     ],
-    costing: 'pedestrian',
-    units: 'kilometers',
   },
-};
+];
 
-async function checkPedestrianRoute() {
+async function checkPedestrianRoute(fixture) {
   const url = new URL('/route', baseUrl);
-  url.searchParams.set('json', JSON.stringify(fixtures.pedestrian));
+  url.searchParams.set(
+    'json',
+    JSON.stringify({ ...fixture, costing: 'pedestrian', units: 'kilometers' }),
+  );
   const response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
@@ -41,17 +50,32 @@ async function checkPedestrianRoute() {
       'Valhalla responded, but no usable pedestrian graph route was returned.',
     );
   }
-  return { distanceKm: summary.length, encodedShapeLength: shape.length };
+  return {
+    region: fixture.name,
+    distanceKm: summary.length,
+    encodedShapeLength: shape.length,
+  };
 }
 
 let lastError;
 do {
   try {
-    const route = await checkPedestrianRoute();
-    console.log(
-      `Valhalla ready at ${baseUrl.origin}; pedestrian fixture route is ${route.distanceKm.toFixed(2)} km.`,
-    );
-    process.exit(0);
+    let route;
+    for (const fixture of fixtures) {
+      try {
+        route = await checkPedestrianRoute(fixture);
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (route) {
+      console.log(
+        `Valhalla ready at ${baseUrl.origin}; ${route.region} pedestrian fixture route is ${route.distanceKm.toFixed(2)} km.`,
+      );
+      process.exit(0);
+    }
+    throw lastError;
   } catch (error) {
     lastError = error;
     if (!shouldWait || Date.now() >= deadline) break;

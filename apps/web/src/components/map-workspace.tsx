@@ -3,13 +3,17 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
 } from 'react';
 import type { GeoJSONFeatureCollection, LngLat } from '@drawtrail/types';
 import { LYON_CENTER, LYON_ZOOM } from '@drawtrail/geo-utils';
-import { lyonLngLatSchema } from '@drawtrail/validation';
+import {
+  lngLatSchema,
+  type RouteGenerationSuccess,
+} from '@drawtrail/validation';
 import {
   localGeocoder,
   type Geocoder,
@@ -24,6 +28,45 @@ const EMPTY_FEATURES: GeoJSONFeatureCollection = {
   features: [],
 };
 
+function searchCircle(center: LngLat, radiusMeters: number) {
+  const earthRadiusMeters = 6_371_008.8;
+  const latitude = (center[1] * Math.PI) / 180;
+  const longitude = (center[0] * Math.PI) / 180;
+  const angularDistance = radiusMeters / earthRadiusMeters;
+  const coordinates: LngLat[] = [];
+  for (let index = 0; index <= 64; index += 1) {
+    const bearing = (index / 64) * Math.PI * 2;
+    const nextLatitude = Math.asin(
+      Math.sin(latitude) * Math.cos(angularDistance) +
+        Math.cos(latitude) * Math.sin(angularDistance) * Math.cos(bearing),
+    );
+    const nextLongitude =
+      longitude +
+      Math.atan2(
+        Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latitude),
+        Math.cos(angularDistance) - Math.sin(latitude) * Math.sin(nextLatitude),
+      );
+    coordinates.push([
+      (((nextLongitude * 180) / Math.PI + 540) % 360) - 180,
+      (nextLatitude * 180) / Math.PI,
+    ]);
+  }
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: { kind: 'search-area' },
+        geometry: { type: 'LineString', coordinates },
+      },
+    ],
+  } satisfies GeoJSONFeatureCollection;
+}
+
+function formatLocation([longitude, latitude]: LngLat) {
+  return `${Math.abs(latitude).toFixed(6)}\u00b0 ${latitude < 0 ? 'S' : 'N'}, ${Math.abs(longitude).toFixed(6)}\u00b0 ${longitude < 0 ? 'W' : 'E'}`;
+}
+
 export function MapWorkspace({
   configuration,
   geocoder = localGeocoder,
@@ -36,6 +79,14 @@ export function MapWorkspace({
   const [startPoint, setStartPoint] = useState<LngLat | null>(null);
   const [targetGeometry, setTargetGeometry] =
     useState<GeoJSONFeatureCollection>(EMPTY_FEATURES);
+  const [routeGeometry, setRouteGeometry] =
+    useState<GeoJSONFeatureCollection>(EMPTY_FEATURES);
+  const [routeResult, setRouteResult] = useState<RouteGenerationSuccess | null>(
+    null,
+  );
+  const [searchAreaRadiusMeters, setSearchAreaRadiusMeters] = useState<
+    number | null
+  >(null);
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [selectionError, setSelectionError] = useState('');
@@ -50,18 +101,25 @@ export function MapWorkspace({
     'idle' | 'loading' | 'empty' | 'error'
   >('idle');
   const searchController = useRef<AbortController | null>(null);
+  const searchAreaGeometry = useMemo(
+    () =>
+      startPoint && searchAreaRadiusMeters !== null
+        ? searchCircle(startPoint, searchAreaRadiusMeters)
+        : EMPTY_FEATURES,
+    [startPoint, searchAreaRadiusMeters],
+  );
 
   useEffect(() => () => searchController.current?.abort(), []);
 
   const selectPoint = useCallback((point: LngLat): boolean => {
-    if (!lyonLngLatSchema.safeParse(point).success) {
-      setSelectionError(
-        'Choose a point inside the Lyon test area: latitude 45.63–45.90, longitude 4.65–5.02.',
-      );
+    if (!lngLatSchema.safeParse(point).success) {
+      setSelectionError('Enter a valid WGS84 latitude and longitude.');
       return false;
     }
     setSelectionError('');
     setTargetGeometry(EMPTY_FEATURES);
+    setRouteGeometry(EMPTY_FEATURES);
+    setRouteResult(null);
     setStartPoint(point);
     setLatitude(point[1].toFixed(6));
     setLongitude(point[0].toFixed(6));
@@ -112,12 +170,12 @@ export function MapWorkspace({
           <p className="eyebrow">YOUR IDEA STARTS SOMEWHERE</p>
           <h1>
             {stage === 'place'
-              ? 'Find your little corner of Lyon.'
+              ? 'Choose an area for your route.'
               : 'Draw a little adventure.'}
           </h1>
           <p>
             {stage === 'place'
-              ? 'Choose where you’ll begin. A new way to see familiar streets.'
+              ? 'Set a point anywhere on the map. Routes can only use streets in the loaded map graph.'
               : 'A few simple lines today. A different way to move tomorrow.'}
           </p>
         </div>
@@ -130,7 +188,7 @@ export function MapWorkspace({
             Start drawing <span aria-hidden="true">↗</span>
           </button>
           <span className="editor-region">
-            <span aria-hidden="true">↗</span> Lyon, France
+            <span aria-hidden="true">↗</span> Choose an area
           </span>
         </div>
       </div>
@@ -152,7 +210,10 @@ export function MapWorkspace({
           </button>
         </li>
         <li>
-          <span>03</span> Find a street route <small>Coming later</small>
+          <span>03</span> Find a street route{' '}
+          <small>
+            {routeResult ? 'Baseline generated' : 'Generate from a stroke'}
+          </small>
         </li>
       </ol>
       <div hidden={stage !== 'place'}>
@@ -196,7 +257,7 @@ export function MapWorkspace({
                 </div>
                 <p className="field-hint">
                   {geocoder
-                    ? `${geocoder.label} · a small place catalog, not address search.`
+                    ? `${geocoder.label} Â· a small place catalog, not address search. Coordinates work anywhere.`
                     : 'Place search is disabled. The map and coordinates still work.'}
                 </p>
               </form>
@@ -252,8 +313,6 @@ export function MapWorkspace({
                       type="number"
                       step="any"
                       inputMode="decimal"
-                      min="45.63"
-                      max="45.9"
                       value={latitude}
                       placeholder="45.764000"
                       aria-invalid={Boolean(selectionError)}
@@ -270,8 +329,6 @@ export function MapWorkspace({
                       type="number"
                       step="any"
                       inputMode="decimal"
-                      min="4.65"
-                      max="5.02"
                       value={longitude}
                       placeholder="4.835700"
                       aria-invalid={Boolean(selectionError)}
@@ -283,7 +340,8 @@ export function MapWorkspace({
                   </div>
                 </div>
                 <p className="field-hint" id="coordinate-help">
-                  Decimal degrees · latitude first in this form.
+                  Decimal degrees · latitude first. Routing only works where the
+                  configured Valhalla graph has map data.
                 </p>
                 {selectionError && (
                   <p id="selection-error" role="alert" className="field-error">
@@ -311,6 +369,8 @@ export function MapWorkspace({
                     onClick={() => {
                       setStartPoint(null);
                       setTargetGeometry(EMPTY_FEATURES);
+                      setRouteGeometry(EMPTY_FEATURES);
+                      setRouteResult(null);
                       setLatitude('');
                       setLongitude('');
                       setSelectionError('');
@@ -322,7 +382,7 @@ export function MapWorkspace({
               </div>
               <output aria-label="Selected start point">
                 {startPoint
-                  ? `${startPoint[1].toFixed(6)}° N, ${startPoint[0].toFixed(6)}° E`
+                  ? formatLocation(startPoint)
                   : 'No start point selected yet.'}
               </output>
               {startPoint && (
@@ -343,7 +403,7 @@ export function MapWorkspace({
             <div className="map-toolbar">
               <div>
                 <span className="map-toolbar-dot" />
-                <strong>Explore Lyon</strong>
+                <strong>Explore the map</strong>
                 <span className="map-toolbar-hint">
                   Pan, zoom, find your place
                 </span>
@@ -362,18 +422,85 @@ export function MapWorkspace({
               view={view}
               onSelect={selectPoint}
               targetGeometry={targetGeometry}
-              routeGeometry={EMPTY_FEATURES}
+              routeGeometry={routeGeometry}
+              searchAreaGeometry={searchAreaGeometry}
             />
-            {targetGeometry.features.length > 0 && (
+            {(targetGeometry.features.length > 0 ||
+              searchAreaRadiusMeters !== null) && (
               <div className="geometry-legend" aria-label="Map geometry legend">
-                <span>
-                  <i className="target-legend-swatch" /> Target drawing
-                </span>
-                <span>
-                  <i className="route-legend-swatch" /> Actual street route (not
-                  generated yet)
-                </span>
+                {searchAreaRadiusMeters !== null && (
+                  <span>
+                    <i className="search-area-legend-swatch" /> Search area ·{' '}
+                    {(searchAreaRadiusMeters / 1000).toFixed(2)} km radius
+                  </span>
+                )}
+                {targetGeometry.features.length > 0 && (
+                  <>
+                    <span>
+                      <i className="target-legend-swatch" /> Target drawing
+                    </span>
+                    <span>
+                      <i className="route-legend-swatch" /> Actual street route
+                      ({routeResult ? 'generated' : 'not generated yet'})
+                    </span>
+                  </>
+                )}
               </div>
+            )}
+            {routeResult && (
+              <section
+                className="route-result-card"
+                aria-label="Generated route results"
+              >
+                <div className="selected-point-heading">
+                  <h2>Generated street route</h2>
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => {
+                      setRouteGeometry(EMPTY_FEATURES);
+                      setRouteResult(null);
+                    }}
+                  >
+                    Clear route
+                  </button>
+                </div>
+                <dl className="route-result-metrics">
+                  <div>
+                    <dt>Activity</dt>
+                    <dd>{routeResult.route.properties.mode}</dd>
+                  </div>
+                  <div>
+                    <dt>Route distance</dt>
+                    <dd>{(routeResult.distanceMeters / 1000).toFixed(2)} km</dd>
+                  </div>
+                  <div>
+                    <dt>Requested</dt>
+                    <dd>
+                      {(routeResult.requestedDistanceMeters / 1000).toFixed(2)}{' '}
+                      km
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Shape similarity</dt>
+                    <dd>{Math.round(routeResult.similarityScore * 100)}%</dd>
+                  </div>
+                  <div>
+                    <dt>Waypoints routed</dt>
+                    <dd>{routeResult.waypointCount}</dd>
+                  </div>
+                </dl>
+                {routeResult.warnings.length > 0 && (
+                  <ul
+                    className="route-result-warnings"
+                    aria-label="Route warnings"
+                  >
+                    {routeResult.warnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                )}
+              </section>
             )}
             <div className="map-attribution">
               <span>
@@ -400,8 +527,8 @@ export function MapWorkspace({
             <div className="map-bottom-note">
               <span aria-hidden="true">✳</span>
               <p>
-                Start with a place you love, then switch to Draw your idea. Real
-                street routing comes in a later chapter.
+                Choose a place, draw one stroke, then generate a route using the
+                local walking or bicycle street network.
               </p>
               <a
                 href="https://www.openstreetmap.org/fixthemap"
@@ -422,8 +549,43 @@ export function MapWorkspace({
         {drawingVisited && (
           <DrawingEditor
             startPoint={startPoint}
+            searchAreaRadiusMeters={searchAreaRadiusMeters}
+            onSearchAreaRadiusChange={setSearchAreaRadiusMeters}
             onPreview={(geometry) => {
               setTargetGeometry(geometry);
+              setRouteGeometry(EMPTY_FEATURES);
+              setRouteResult(null);
+              setStage('place');
+            }}
+            onGenerated={(result) => {
+              setRouteResult(result);
+              setTargetGeometry({
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    id: 'generation-target',
+                    properties: { strokeId: 'target', label: 'Target shape' },
+                    geometry: result.targetGeometry,
+                  },
+                ],
+              });
+              setRouteGeometry({
+                type: 'FeatureCollection',
+                features: [result.route],
+              });
+              const targetCoordinates = result.targetGeometry.coordinates;
+              const targetCenter: LngLat = [
+                targetCoordinates.reduce(
+                  (sum, [longitude]) => sum + longitude,
+                  0,
+                ) / targetCoordinates.length,
+                targetCoordinates.reduce(
+                  (sum, [, latitude]) => sum + latitude,
+                  0,
+                ) / targetCoordinates.length,
+              ];
+              centerOn(targetCenter, searchAreaRadiusMeters ? 13 : 15);
               setStage('place');
             }}
           />

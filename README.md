@@ -2,7 +2,7 @@
 
 A local-first GPS art app: turn a simple drawing into a connected walking, running, or cycling route on real streets.
 
-This checkout includes **Phase 05: local routing foundations** alongside the Lyon map workspace. At `/workspace`, choose a starting location, then draw or import a shape, try deterministic nearby placements, and preview the target geometry on the map. An optional local Valhalla service can return real pedestrian and bicycle routes; the web client keeps target art separate from router-validated street geometry. Full drawing-to-route generation and exports are later milestones. Drawings and the homepage artwork are target art, not navigable routes.
+This checkout includes **Phase 07 area-based route search** alongside the GPS-art workspace. At `/workspace`, choose an area center anywhere on the map, draw or import a shape, then optionally search an adjustable radius around that point. The optimizer tries eight bounded positions, rotations, and scales, and returns the strongest route it finds. Review the real street geometry, measured distance, shape similarity, and warnings on the map. Search is limited by the region loaded into Valhalla; the local Rhône-Alpes graph covers the Lyon workspace. Drawings and homepage artwork are target art, not navigable routes.
 
 ## Requirements
 
@@ -71,6 +71,8 @@ Drawing drafts now survive reloads on the same browser/device. The map location 
 Geographic placement uses a local East/North metric projection and deterministic candidate generation. See [geographic placement](docs/algorithm/geographic-placement.md) for projection limits, footprint semantics, validation warnings and overlay colors.
 
 To run routing locally, start Docker Desktop, then run `pnpm routing:up` and `pnpm routing:health`. The initial Valhalla graph uses Andorra as a small test region and is stored in a persistent Docker volume. Routing setup, larger Lyon/Rhône extracts, disk/RAM guidance, OSM licensing, and opt-in integration tests are documented in [local routing](docs/development/routing.md). Stop the service with `pnpm routing:down`; the graph volume remains available for the next start.
+
+To exercise drawing-to-route area search, start `pnpm dev` in another terminal and run `pnpm test:generation:integration`. The smoke test detects the loaded Lyon or Andorra graph and searches three candidates. See [generation development](docs/development/generation.md) for details and fixed-fixture tests.
 
 ## Layout
 

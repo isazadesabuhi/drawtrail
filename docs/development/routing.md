@@ -15,6 +15,8 @@ The Compose service uses the pinned `ghcr.io/valhalla/valhalla-scripted:3.9.1` i
 
 The small country extract keeps the initial setup manageable. Graph building needs free disk space for the PBF, intermediate files, graph tiles, and tile archive; allow several GB. RAM use depends on the OSM region and builder threads; the default is two threads. Larger extracts can need substantially more memory and disk, so increase `VALHALLA_SERVER_THREADS` only when the host has headroom.
 
+The workspace accepts a map center anywhere, but routing can only find streets in the loaded graph. The map and coordinate form do not download or switch graph regions automatically.
+
 To change the region before its first build, set `VALHALLA_TILE_URL` to a single OSM PBF URL. For example, the Geofabrik Rhône-Alpes extract covers the Lyon test area:
 
 ```powershell
@@ -53,7 +55,7 @@ For an opt-in smoke test against the loaded local graph, run:
 pnpm test:routing:integration
 ```
 
-The smoke test checks pedestrian and bicycle A-to-B routes in Andorra la Vella, reports whether this extract selects different paths for the profiles, then checks a disconnected point outside the small fixture graph and an invalid coordinate. Override `VALHALLA_URL` when the service listens elsewhere. OSM is live and updated by Geofabrik, so tests assert route invariants rather than exact geometry.
+The smoke test detects the loaded Lyon or Andorra graph, checks pedestrian and bicycle A-to-B routes there, then checks a disconnected point and an invalid coordinate. Override `VALHALLA_URL` when the service listens elsewhere. OSM is live and updated by Geofabrik, so tests assert route invariants rather than exact geometry.
 
 ## References
 

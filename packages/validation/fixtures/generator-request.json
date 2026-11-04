@@ -1,0 +1,36 @@
+{
+  "drawing": {
+    "version": 1,
+    "name": "Fixture heart",
+    "source": "preset",
+    "strokes": [
+      {
+        "id": "heart",
+        "label": "Heart",
+        "closed": true,
+        "points": [
+          [0.5, 0.1],
+          [0.9, 0.4],
+          [0.5, 0.9],
+          [0.1, 0.4],
+          [0.5, 0.1]
+        ]
+      }
+    ]
+  },
+  "center": [1.5218, 42.5063],
+  "mode": "walking",
+  "targetDistanceKm": 3,
+  "loop": true,
+  "bounds": { "radiusMeters": 1500, "continuityToleranceMeters": 2 },
+  "settings": {
+    "maxWaypoints": 8,
+    "seed": "fixture-heart-01",
+    "placement": {
+      "rotationDegrees": 0,
+      "scale": 1,
+      "offsetEastMeters": 0,
+      "offsetNorthMeters": 0
+    }
+  }
+}

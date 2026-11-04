@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GeoJSONSource, Map as LibreMap, Marker } from 'maplibre-gl';
 import type { GeoJSONFeatureCollection, LngLat } from '@drawtrail/types';
-import { LYON_BOUNDS, LYON_CENTER, LYON_ZOOM } from '@drawtrail/geo-utils';
+import { LYON_CENTER, LYON_ZOOM } from '@drawtrail/geo-utils';
 import type { MapConfiguration } from '../lib/map-config';
 
 export interface ViewRequest {
@@ -18,10 +18,12 @@ interface MapCanvasProps {
   onSelect: (point: LngLat) => boolean;
   targetGeometry: GeoJSONFeatureCollection;
   routeGeometry: GeoJSONFeatureCollection;
+  searchAreaGeometry: GeoJSONFeatureCollection;
 }
 
 const TARGET_SOURCE = 'drawtrail-target-geometry';
 const ROUTE_SOURCE = 'drawtrail-route-geometry';
+const SEARCH_AREA_SOURCE = 'drawtrail-search-area';
 
 function mutableGeoJSON(data: GeoJSONFeatureCollection) {
   return JSON.parse(JSON.stringify(data)) as Parameters<
@@ -36,6 +38,7 @@ export function MapCanvas({
   onSelect,
   targetGeometry,
   routeGeometry,
+  searchAreaGeometry,
 }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LibreMap | null>(null);
@@ -44,6 +47,7 @@ export function MapCanvas({
   const viewRef = useRef(view);
   const targetGeometryRef = useRef(targetGeometry);
   const routeGeometryRef = useRef(routeGeometry);
+  const searchAreaGeometryRef = useRef(searchAreaGeometry);
   const syncMarkerRef = useRef<(() => void) | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
@@ -98,9 +102,8 @@ export function MapCanvas({
           style: configuration.style,
           center: [...viewRef.current.center],
           zoom: viewRef.current.zoom,
-          minZoom: 10,
+          minZoom: 2,
           maxZoom: 18,
-          maxBounds: [[...LYON_BOUNDS[0]], [...LYON_BOUNDS[1]]],
           attributionControl: false,
           renderWorldCopies: false,
         });
@@ -119,7 +122,7 @@ export function MapCanvas({
           .getCanvas()
           .setAttribute(
             'aria-label',
-            'Lyon map. Pan with arrow keys; use the coordinate form to select a start point.',
+            'Map. Pan with arrow keys; use the coordinate form to select a search area center.',
           );
         map.on('load', () => {
           window.clearTimeout(timeout);
@@ -130,6 +133,20 @@ export function MapCanvas({
           map?.addSource(ROUTE_SOURCE, {
             type: 'geojson',
             data: mutableGeoJSON(routeGeometryRef.current),
+          });
+          map?.addSource(SEARCH_AREA_SOURCE, {
+            type: 'geojson',
+            data: mutableGeoJSON(searchAreaGeometryRef.current),
+          });
+          map?.addLayer({
+            id: 'drawtrail-search-area-line',
+            type: 'line',
+            source: SEARCH_AREA_SOURCE,
+            paint: {
+              'line-color': '#657d91',
+              'line-width': 2,
+              'line-dasharray': [2, 2],
+            },
           });
           map?.addLayer({
             id: 'drawtrail-route-line',
@@ -243,6 +260,13 @@ export function MapCanvas({
       ?.setData(mutableGeoJSON(routeGeometry));
   }, [routeGeometry]);
 
+  useEffect(() => {
+    searchAreaGeometryRef.current = searchAreaGeometry;
+    mapRef.current
+      ?.getSource<GeoJSONSource>(SEARCH_AREA_SOURCE)
+      ?.setData(mutableGeoJSON(searchAreaGeometry));
+  }, [searchAreaGeometry]);
+
   const unconfigured = configuration.mode === 'unconfigured';
   return (
     <div className="map-stage">
@@ -250,7 +274,7 @@ export function MapCanvas({
         className="map-surface"
         ref={container}
         role="region"
-        aria-label="Interactive Lyon map"
+        aria-label="Interactive map"
       />
       {unconfigured ? (
         <div className="map-message" role="status">
@@ -259,7 +283,7 @@ export function MapCanvas({
         </div>
       ) : status === 'loading' ? (
         <div className="map-message" role="status">
-          <strong>Finding your view of Lyon…</strong>
+          <strong>Finding your map view…</strong>
           <p>Loading the map. Coordinate selection is already available.</p>
         </div>
       ) : status === 'error' ? (
@@ -281,7 +305,9 @@ export function MapCanvas({
           </button>
         </div>
       ) : (
-        <span className="map-ready-badge">Lyon · click to set your start</span>
+        <span className="map-ready-badge">
+          Map · click to set your area center
+        </span>
       )}
       <output className="map-view-readout" aria-label="Map viewport">
         View: {viewport.center[1].toFixed(4)}, {viewport.center[0].toFixed(4)} ·

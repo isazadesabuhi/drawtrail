@@ -1,0 +1,37 @@
+# First GPS-art route generation
+
+In `/workspace`, choose a map center anywhere using the map or WGS84 coordinates, select or draw one stroke, choose walking/running/cycling, set a target distance, and request a street route. Closed strokes are routed as loops. Separate strokes remain separate; select one stroke at a time rather than silently drawing a connector. Routing only works where the configured Valhalla graph contains data and supports the selected activity.
+
+To search for a better placement, enable **Search for the shape around my chosen area** and choose a radius from 0.25 to 25 km. The circle is shown on the map around the selected pin. The server tests eight deterministic candidate centers inside that circle, with varied rotation and scale, routes each viable candidate, and returns the highest-scoring result. The score combines shape similarity with a penalty for distance deviation. The currently selected area is a circle for possible shape centers; the drawing footprint itself may extend beyond the circle.
+
+The server creates a metric target shape around the selected center, samples up to eight ordered points while retaining strong corners, and asks Valhalla to route each adjacent pair in the selected mode. The editor scales the overall waypoint search radius with the requested distance and placement offset (minimum 1.5 km, maximum 50 km). Each sampled waypoint starts with a 250 m road snap radius; if Valhalla finds no suitable edge, the server retries that segment with radii of 1 km, 3 km, and at most 5 km. Larger snaps can move the street route farther from the drawing, so the returned similarity and distance warnings remain important. The server checks that waypoints stay inside the overall radius, rejects engine failures and disconnected segment joins, uses the router's segment distances, scores similarity, and returns measured distance and warnings. Only engine-returned street geometry is drawn as the route. The score is `clamp(1 - symmetricMeanNearestDistance / targetBoundingBoxDiagonal, 0, 1)` from 64 evenly spaced samples on each line; it is a shape comparison, not a safety or legality guarantee. The initial warning thresholds follow [route quality metrics](../algorithm/metrics.md).
+
+## Test the baseline
+
+Run the ordinary deterministic tests first:
+
+```sh
+pnpm test
+pnpm typecheck
+```
+
+For a real route against the loaded Lyon or Andorra graph, keep Valhalla running and start the web app in a second terminal:
+
+```sh
+pnpm routing:health
+pnpm dev
+```
+
+Then in a third terminal run:
+
+```sh
+pnpm test:generation:integration
+```
+
+This detects which supported local graph is loaded, submits the fixed heart fixture to `/api/v1/generate` in that region, and checks ordered waypoints, a real measured route, similarity range, and loop closure. Override the app URL with `DRAWTRAIL_URL` when it is not at `http://127.0.0.1:3000`.
+
+The local place-name catalog contains Lyon places only, but map clicks and coordinates accept any valid WGS84 location. The default small Andorra graph can route only within Andorra; choose an area inside its coverage or configure the Rhône-Alpes extract for Lyon as documented in [local routing](routing.md). Fixed request and response fixtures plus mocked segment routes keep normal tests stable as OSM changes.
+
+## Current limits
+
+Area search is bounded to eight placements per request and returns one best route; it does not return three alternatives or search an entire region automatically. The user chooses the search center and radius. Requested length remains a target, so actual street length can differ; the UI displays the measurement and warnings instead of claiming an exact match.

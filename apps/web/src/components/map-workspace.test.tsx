@@ -160,12 +160,15 @@ beforeEach(() => {
   engine.fail = false;
   vi.clearAllMocks();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('map workspace with a mocked renderer', () => {
   it('starts in Lyon, exposes attributed loading/ready states, and cleans up', async () => {
     const page = render(<MapWorkspace configuration={configuration} />);
-    expect(screen.getByText('Finding your view of Lyon…')).toBeInTheDocument();
+    expect(screen.getByText('Finding your map view…')).toBeInTheDocument();
     const map = await mountedMap();
     expect(map.center).toEqual(LYON_CENTER);
     expect(map.zoom).toBe(LYON_ZOOM);
@@ -177,6 +180,10 @@ describe('map workspace with a mocked renderer', () => {
     );
     expect(map.addSource).toHaveBeenCalledWith(
       'drawtrail-route-geometry',
+      expect.objectContaining({ type: 'geojson' }),
+    );
+    expect(map.addSource).toHaveBeenCalledWith(
+      'drawtrail-search-area',
       expect.objectContaining({ type: 'geojson' }),
     );
     expect(map.addLayer).toHaveBeenCalledWith(
@@ -192,7 +199,7 @@ describe('map workspace with a mocked renderer', () => {
       }),
     );
     expect(
-      screen.getByText('Lyon · click to set your start'),
+      screen.getByText('Map · click to set your area center'),
     ).toBeInTheDocument();
     expect(screen.getByText('Test map attribution')).toBeVisible();
     act(() => map.emit('click', [4.84, 45.77]));
@@ -236,6 +243,131 @@ describe('map workspace with a mocked renderer', () => {
     );
   });
 
+  it('posts one selected stroke and displays the generated route and measured metrics', async () => {
+    const result = {
+      status: 'success',
+      targetGeometry: {
+        type: 'LineString',
+        coordinates: [
+          [4.84, 45.77],
+          [4.8401, 45.7701],
+        ],
+      },
+      route: {
+        type: 'Feature',
+        properties: { mode: 'walking' },
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [4.84, 45.77],
+            [4.84005, 45.7702],
+            [4.8401, 45.7701],
+          ],
+        },
+      },
+      distanceMeters: 1800,
+      requestedDistanceMeters: 3000,
+      similarityScore: 0.82,
+      waypointCount: 8,
+      warnings: [
+        'Routed distance differs from the requested distance by more than 20%.',
+      ],
+    };
+    const fetcher = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify(result), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    render(<MapWorkspace configuration={configuration} />);
+    const map = await mountedMap();
+    act(() => map.emit('load'));
+    enterCoordinates('45.77', '4.84');
+    fireEvent.click(screen.getByRole('button', { name: /Draw your idea/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
+    fireEvent.click(
+      screen.getByLabelText('Search for the shape around my chosen area'),
+    );
+    expect(
+      screen.getByLabelText('Search radius around the map pin (km)'),
+    ).toHaveValue(2);
+    expect(
+      engine.sources.get('drawtrail-search-area')?.setData,
+    ).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: 'FeatureCollection',
+        features: [
+          expect.objectContaining({ properties: { kind: 'search-area' } }),
+        ],
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Generate street route' }),
+    );
+
+    expect(await screen.findByText('Generated street route')).toBeVisible();
+    expect(screen.getByText('1.80 km')).toBeVisible();
+    expect(screen.getByText('82%')).toBeVisible();
+    expect(screen.getByLabelText('Map geometry legend')).toHaveTextContent(
+      'Actual street route (generated)',
+    );
+    const request = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body));
+    expect(request).toMatchObject({
+      center: [4.84, 45.77],
+      mode: 'walking',
+      targetDistanceKm: 3,
+      loop: true,
+      settings: {
+        searchArea: { radiusMeters: 2000, candidateCount: 8 },
+      },
+    });
+    expect(request.bounds.radiusMeters).toBeGreaterThan(3000);
+    expect(request.drawing.strokes).toHaveLength(1);
+    expect(
+      engine.sources.get('drawtrail-route-geometry')?.setData,
+    ).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: 'FeatureCollection',
+        features: [
+          expect.objectContaining({ properties: { mode: 'walking' } }),
+        ],
+      }),
+    );
+  });
+
+  it('shows a typed routing failure without adding a route overlay', async () => {
+    const fetcher = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            status: 'error',
+            code: 'missing_region',
+            message: 'No routing graph covers one of these waypoints.',
+            warnings: [],
+          }),
+          { status: 404 },
+        ),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    render(<MapWorkspace configuration={configuration} />);
+    const map = await mountedMap();
+    act(() => map.emit('load'));
+    enterCoordinates('45.77', '4.84');
+    fireEvent.click(screen.getByRole('button', { name: /Draw your idea/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Generate street route' }),
+    );
+
+    expect(
+      await screen.findByRole('alert', { name: 'Drawing feedback' }),
+    ).toHaveTextContent('No routing graph covers one of these waypoints.');
+    expect(
+      screen.queryByText('Generated street route'),
+    ).not.toBeInTheDocument();
+    expect(
+      engine.sources.get('drawtrail-route-geometry')?.setData,
+    ).not.toHaveBeenCalled();
+  });
+
   it('stores clicks and drags in editor state with explicit GeoJSON order', async () => {
     render(<MapWorkspace configuration={configuration} />);
     const map = await mountedMap();
@@ -263,7 +395,7 @@ describe('map workspace with a mocked renderer', () => {
     );
   });
 
-  it('rejects swapped, missing, and out-of-area coordinates without losing a valid start', async () => {
+  it('accepts WGS84 coordinates anywhere and rejects invalid coordinates without losing a valid start', async () => {
     render(<MapWorkspace configuration={configuration} />);
     await mountedMap();
     fireEvent.click(screen.getByRole('button', { name: 'Set start point' }));
@@ -272,15 +404,22 @@ describe('map workspace with a mocked renderer', () => {
     );
     enterCoordinates('45.764', '4.8357');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    enterCoordinates('4.8357', '45.764');
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'inside the Lyon test area',
-    );
+    enterCoordinates('45.764', '181');
+    expect(screen.getByRole('alert')).toHaveTextContent('valid WGS84');
     expect(screen.getByLabelText('Selected start point')).toHaveTextContent(
       '45.764000° N, 4.835700° E',
     );
-    act(() => engine.markers[0]!.dragTo([3, 44]));
+    act(() => engine.markers[0]!.dragTo([181, 44]));
     expect(engine.markers[0]!.point).toEqual([4.8357, 45.764]);
+  });
+
+  it('allows a start point in another world region for area search', async () => {
+    render(<MapWorkspace configuration={configuration} />);
+    await mountedMap();
+    enterCoordinates('42.5063', '1.5218');
+    expect(screen.getByLabelText('Selected start point')).toHaveTextContent(
+      '42.506300° N, 1.521800° E',
+    );
   });
 
   it('keeps manual selection and disabled-search fallback working when tiles fail, including retry', async () => {

@@ -44,6 +44,8 @@ export interface ValhallaClientOptions {
 
 export interface RouteOptions {
   signal?: AbortSignal;
+  /** Maximum distance Valhalla should consider when snapping a waypoint to a road. */
+  snapRadiusMeters?: number;
   walkingSpeedKph?: number;
   bicycleType?: 'road' | 'cross' | 'hybrid' | 'mountain';
   useRoads?: number;
@@ -219,10 +221,21 @@ export class ValhallaClient {
     }
 
     const costing = mode === 'cycling' ? 'bicycle' : 'pedestrian';
+    const snapRadiusMeters = options.snapRadiusMeters ?? 250;
+    if (
+      !Number.isFinite(snapRadiusMeters) ||
+      snapRadiusMeters < 1 ||
+      snapRadiusMeters > 5_000
+    ) {
+      throw new ValhallaError(
+        'invalid_waypoint',
+        'Waypoint road search radius must be between 1 and 5,000 m.',
+      );
+    }
     const request: Record<string, unknown> = {
       locations: [
-        { lon: from[0], lat: from[1], type: 'break' },
-        { lon: to[0], lat: to[1], type: 'break' },
+        { lon: from[0], lat: from[1], type: 'break', radius: snapRadiusMeters },
+        { lon: to[0], lat: to[1], type: 'break', radius: snapRadiusMeters },
       ],
       costing,
       units: 'kilometers',
@@ -264,12 +277,28 @@ export class ValhallaClient {
       request.costing_options = { [costing]: costingOptions };
 
     const url = new URL('/route', this.baseUrl);
-    url.searchParams.set('json', JSON.stringify(request));
+    const snapRadii = [
+      ...new Set([
+        snapRadiusMeters,
+        Math.max(snapRadiusMeters, 1_000),
+        Math.max(snapRadiusMeters, 3_000),
+        5_000,
+      ]),
+    ];
+    let snapRadiusIndex = 0;
+    let attempt = 0;
 
-    for (let attempt = 0; ; attempt += 1) {
+    while (true) {
       if (options.signal?.aborted) {
         throw new ValhallaError('cancelled', 'Route request was cancelled.');
       }
+      const currentSnapRadius = snapRadii[snapRadiusIndex]!;
+      for (const location of request.locations as Array<
+        Record<string, unknown>
+      >) {
+        location.radius = currentSnapRadius;
+      }
+      url.searchParams.set('json', JSON.stringify(request));
       const controller = new AbortController();
       const onAbort = () => controller.abort(options.signal?.reason);
       options.signal?.addEventListener('abort', onAbort, { once: true });
@@ -283,7 +312,23 @@ export class ValhallaClient {
         const body: unknown = await response.json().catch(() => null);
         if (!response.ok) {
           const error = mapEngineError(response.status, body);
-          if (error.retryable && attempt < this.retries) continue;
+          if (
+            error.code === 'invalid_waypoint' &&
+            snapRadiusIndex < snapRadii.length - 1
+          ) {
+            snapRadiusIndex += 1;
+            continue;
+          }
+          if (error.code === 'invalid_waypoint') {
+            throw new ValhallaError(
+              'invalid_waypoint',
+              `No routeable edge was found within ${currentSnapRadius} m of these waypoints. Tried wider road searches up to this distance.`,
+            );
+          }
+          if (error.retryable && attempt < this.retries) {
+            attempt += 1;
+            continue;
+          }
           throw error;
         }
         const parsed = valhallaResponseSchema.safeParse(body);
@@ -329,7 +374,10 @@ export class ValhallaClient {
             { cause: error },
           );
         }
-        if (attempt < this.retries) continue;
+        if (attempt < this.retries) {
+          attempt += 1;
+          continue;
+        }
         throw new ValhallaError(
           'engine_down',
           'Could not connect to the Valhalla routing service.',

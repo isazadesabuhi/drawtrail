@@ -34,6 +34,6 @@ test('homepage loads, activity selection works, and the viewport does not overfl
   expect(errors).toEqual([]);
   await page.getByRole('link', { name: 'Meet your workspace' }).click();
   await expect(
-    page.getByRole('heading', { name: 'Find your little corner of Lyon.' }),
+    page.getByRole('heading', { name: 'Choose an area for your route.' }),
   ).toBeVisible();
 });

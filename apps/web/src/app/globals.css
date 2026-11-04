@@ -747,6 +747,54 @@ footer p {
   padding: 12px 14px;
   font-size: 11px;
 }
+.generation-settings {
+  display: grid;
+  gap: 8px;
+  margin-top: 15px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.generation-settings > label:not(.loop-setting) {
+  margin: 2px 0 -4px;
+  color: #52604d;
+  font-size: 10px;
+  font-weight: 600;
+}
+.generation-settings select,
+.generation-settings input[type='number'] {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #dce1d3;
+  border-radius: 5px;
+  color: var(--ink);
+  background: #fffefb;
+  font-size: 11px;
+}
+.generation-settings .loop-setting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 10px;
+  font-weight: 500;
+}
+.generation-settings input[type='checkbox'] {
+  width: 16px;
+  min-height: 16px;
+  margin: 0;
+  accent-color: var(--green);
+}
+.generate-route-button {
+  width: 100%;
+  justify-content: center;
+  min-height: 42px;
+  font-size: 11px;
+}
+.generate-route-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
 .drawing-tool-card summary {
   cursor: pointer;
   line-height: 1.6;
@@ -1270,6 +1318,44 @@ footer p {
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
+.route-result-card {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefb;
+}
+.route-result-card h2 {
+  margin: 0;
+  font-size: 14px;
+}
+.route-result-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+.route-result-metrics div {
+  min-width: 0;
+}
+.route-result-metrics dt {
+  color: #72796e;
+  font-size: 10px;
+}
+.route-result-metrics dd {
+  margin: 3px 0 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: capitalize;
+  overflow-wrap: anywhere;
+}
+.route-result-warnings {
+  margin: 14px 0 0;
+  padding-left: 18px;
+  color: #93512f;
+  font-size: 11px;
+  line-height: 1.6;
+}
 .coordinate-order {
   margin: 11px 0 0;
   color: #6a7a5d;
@@ -1353,6 +1439,13 @@ footer p {
 }
 .target-legend-swatch {
   background: #d27143;
+}
+.search-area-legend-swatch {
+  background: repeating-linear-gradient(
+    90deg,
+    #657d91 0 5px,
+    transparent 5px 8px
+  );
 }
 .route-legend-swatch {
   background: repeating-linear-gradient(

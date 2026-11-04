@@ -52,6 +52,38 @@ describe('Valhalla client', () => {
     const request = JSON.parse(requestUrl.searchParams.get('json') ?? '{}');
     expect(request.costing).toBe('pedestrian');
     expect(request.costing_options.pedestrian.walking_speed).toBe(8);
+    expect(
+      request.locations.map((location: { radius: number }) => location.radius),
+    ).toEqual([250, 250]);
+  });
+
+  it('widens the road snap radius when Valhalla cannot find a routeable edge', async () => {
+    const radii: number[] = [];
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const requestUrl = new URL(String(input));
+      const request = JSON.parse(requestUrl.searchParams.get('json') ?? '{}');
+      radii.push(request.locations[0].radius);
+      if (radii.length < 3) {
+        return new Response(
+          JSON.stringify({
+            error_code: 171,
+            error: 'No suitable edges near location',
+          }),
+          { status: 400 },
+        );
+      }
+      return success();
+    });
+    const client = new ValhallaClient({
+      baseUrl: 'http://localhost:8002',
+      fetch: fetcher,
+    });
+
+    await expect(
+      client.route('walking', [1.5, 42], [1.50001, 42.00001]),
+    ).resolves.toMatchObject({ distanceMeters: 1250 });
+
+    expect(radii).toEqual([250, 1000, 3000]);
   });
 
   it('requests bicycle costing and mode-specific options for cycling', async () => {

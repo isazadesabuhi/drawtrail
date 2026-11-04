@@ -21,6 +21,8 @@ services:
         - CMD-SHELL
         - >-
           curl --globoff --fail --silent --show-error
+          'http://127.0.0.1:8002/route?json={"locations":[{"lat":45.764,"lon":4.8357},{"lat":45.768,"lon":4.841}],"costing":"pedestrian","units":"kilometers"}'
+          > /dev/null 2>&1 || curl --globoff --fail --silent --show-error
           'http://127.0.0.1:8002/route?json={"locations":[{"lat":42.5063,"lon":1.5218},{"lat":42.5092,"lon":1.5342}],"costing":"pedestrian","units":"kilometers"}'
           > /dev/null
       interval: 30s

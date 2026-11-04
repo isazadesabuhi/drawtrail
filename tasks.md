@@ -369,61 +369,61 @@
 
 ## Phase 06 — First working GPS-art generation (P0)
 
-### [ ] 06-01 — Define generator request/response schemas
+### [x] 06-01 — Define generator request/response schemas
 
 **Scope:** Include drawing, center, mode, target distance, loop preference, bounds and settings.
 
 **Acceptance:** Zod types and examples cover success/failure.
 
-### [ ] 06-02 — Sample ordered drawing waypoints
+### [x] 06-02 — Sample ordered drawing waypoints
 
 **Scope:** Produce N metric candidate points preserving feature corners.
 
 **Acceptance:** Deterministic sampling for fixtures.
 
-### [ ] 06-03 — Create waypoint feasibility filter
+### [x] 06-03 — Create waypoint feasibility filter
 
 **Scope:** Check bounds and route access; discard implausible or out-of-region points.
 
 **Acceptance:** Invalid candidates get reason codes.
 
-### [ ] 06-04 — Implement segment-by-segment routing
+### [x] 06-04 — Implement segment-by-segment routing
 
 **Scope:** Route between consecutive candidate waypoints preserving stroke order.
 
 **Acceptance:** Returned path is concatenated in correct order.
 
-### [ ] 06-05 — Implement closed-loop completion
+### [x] 06-05 — Implement closed-loop completion
 
 **Scope:** Connect ending point to start when loop=true; do not assume geometric closure means network closure.
 
 **Acceptance:** Start and end within configured network tolerance.
 
-### [ ] 06-06 — Calculate real routed distance
+### [x] 06-06 — Calculate real routed distance
 
 **Scope:** Use routed geometry/engine result, not straight-line shape length.
 
 **Acceptance:** Fixture distance matches route response tolerance.
 
-### [ ] 06-07 — Implement fixed-location baseline
+### [x] 06-07 — Implement fixed-location baseline
 
 **Scope:** Generate first viable shape route near a pinned location using deterministic placement.
 
 **Acceptance:** Heart fixture yields a continuous route in demo area or typed failure.
 
-### [ ] 06-08 — Score basic shape similarity
+### [x] 06-08 — Score basic shape similarity
 
 **Scope:** Rasterize/normalize or resample geometry; compare target vs route with documented metric.
 
 **Acceptance:** Identical fixture scores better than distorted one.
 
-### [ ] 06-09 — Add baseline result page
+### [x] 06-09 — Add baseline result page
 
 **Scope:** Show generated route, target overlay, distance, similarity and explicit warnings.
 
 **Acceptance:** User can visually compare target and result.
 
-### [ ] 06-10 — Create golden test scenarios
+### [x] 06-10 — Create golden test scenarios
 
 **Scope:** Store real route examples and expected invariants; avoid exact path snapshots against changing OSM tiles.
 
@@ -431,19 +431,19 @@
 
 ## Phase 07 — Quality and optimization (P1)
 
-### [ ] 07-01 — Add rotation search
+### [x] 07-01 — Add rotation search
 
 **Scope:** Evaluate a small bounded set of shape rotations.
 
 **Acceptance:** Best candidate selected by score.
 
-### [ ] 07-02 — Add scale search
+### [x] 07-02 — Add scale search
 
 **Scope:** Test scales around target distance within configurable range.
 
 **Acceptance:** At least two sizes can be compared.
 
-### [ ] 07-03 — Add placement search
+### [x] 07-03 — Add placement search
 
 **Scope:** Search candidate centers inside user-selected radius/bounds.
 
@@ -1000,25 +1000,25 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 | 05-07 | done   | See phase dependencies above | Running maps to pedestrian costing with optional speed.                                                                                                  |
 | 05-08 | done   | See phase dependencies above | Typed route failures covered by fixture tests.                                                                                                           |
 | 05-09 | done   | See phase dependencies above | Live A-to-B, disconnected endpoint, and invalid-coordinate smoke passed.                                                                                 |
-| 06-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 06-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 06-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 06-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 06-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 06-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 06-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 06-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 06-09 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 06-10 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 07-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 07-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 07-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 06-01 | done   | See phase dependencies above | Generator request, success, and failure schemas are fixture-tested.                                                                                      |
+| 06-02 | done   | See phase dependencies above | Metric waypoint sampling is deterministic and preserves salient corners.                                                                                 |
+| 06-03 | done   | See phase dependencies above | Search radius and route-access failures return typed reason codes.                                                                                       |
+| 06-04 | done   | See phase dependencies above | Ordered segment routing and concatenation pass fixtures and live route smoke.                                                                            |
+| 06-05 | done   | See phase dependencies above | Loops route back to the start and enforce configured closure tolerance.                                                                                  |
+| 06-06 | done   | See phase dependencies above | Distance sums Valhalla segment metrics; live baseline measured 4.59 km.                                                                                  |
+| 06-07 | done   | See phase dependencies above | Live heart fixture generated a continuous 4.59 km route in Andorra.                                                                                      |
+| 06-08 | done   | See phase dependencies above | Documented symmetric shape score ranks identical geometry above distortion.                                                                              |
+| 06-09 | done   | See phase dependencies above | Workspace shows target/route overlays, metrics, similarity, and warnings.                                                                                |
+| 06-10 | done   | See phase dependencies above | Opt-in fixed-fixture generation smoke checks route and closure invariants.                                                                               |
+| 07-01 | done   | See phase dependencies above | Deterministic area search compares bounded rotations and selects the highest-scoring viable result; covered by generator tests and live Lyon generation. |
+| 07-02 | done   | See phase dependencies above | Scale candidates vary physical target size around the requested distance; scale behavior is covered by a metric-length test.                             |
+| 07-03 | done   | See phase dependencies above | User-selected map center and radius bound candidate centers; search circle is shown on the map and live-tested against Lyon Valhalla.                    |
 | 07-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
 | 07-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
 | 07-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
 | 07-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
 | 07-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 07-09 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-09 | done   | See phase dependencies above | Seed, radius bounds, and candidate count produce repeatable search results.                                                                              |
 | 07-10 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
 | 07-11 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
 | 07-12 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
@@ -1104,3 +1104,5 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 - 2026-11-04: Phase 03 implemented and verified locally: 99 unit/component tests, 16 development and 16 production browser checks. See docs/progress/phase-03.md and docs/algorithm/drawing-inputs.md for limits and evidence. Drawing drafts exclude map location/image files. No task IDs or acceptance criteria changed; Phase 04 is next.
 
 - 2026-11-04: Phase 04 geographic placement foundations implemented. Metric projection, proportion-preserving footprints, seeded placements, geometry validation, separate MapLibre target/actual-route layers, and canonical fixtures verified. Route layer is intentionally empty pending routing. See docs/progress/phase-04.md and docs/algorithm/geographic-placement.md.
+
+- 2026-11-05: Added Phase 07 bounded area-search slice: global WGS84 map selection, visible adjustable search radius, deterministic center/rotation/scale candidates, route scoring, and Rhône-Alpes local graph setup. Tasks 07-01, 07-02, 07-03, and 07-09 are complete. See docs/progress/phase-07.md for test and live-route evidence; remaining Phase 07 work stays open.

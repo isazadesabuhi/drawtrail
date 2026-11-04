@@ -14,6 +14,7 @@ import type {
   DrawingStroke,
   GeoJSONFeatureCollection,
   LngLat,
+  ActivityMode,
 } from '@drawtrail/types';
 import {
   changeDrawing,
@@ -30,7 +31,12 @@ import {
   type DrawingTransform,
   type PresetName,
 } from '@drawtrail/geo-utils';
-import { drawingSchema } from '@drawtrail/validation';
+import {
+  activityModeSchema,
+  drawingSchema,
+  routeGenerationResponseSchema,
+  type RouteGenerationSuccess,
+} from '@drawtrail/validation';
 import { readDrawingDraft, writeDrawingDraft } from '../lib/drawing-draft';
 import { importSvg, MAX_SVG_BYTES } from '../lib/svg-import';
 import {
@@ -53,10 +59,16 @@ const presets: readonly PresetName[] = [
 
 export function DrawingEditor({
   startPoint = null,
+  searchAreaRadiusMeters = null,
+  onSearchAreaRadiusChange = () => {},
   onPreview = () => {},
+  onGenerated = () => {},
 }: {
   startPoint?: LngLat | null;
+  searchAreaRadiusMeters?: number | null;
+  onSearchAreaRadiusChange?: (radiusMeters: number | null) => void;
   onPreview?: (geometry: GeoJSONFeatureCollection) => void;
+  onGenerated?: (result: RouteGenerationSuccess) => void;
 }) {
   const hydrated = useSyncExternalStore(
     subscribe,
@@ -64,7 +76,13 @@ export function DrawingEditor({
     serverSnapshot,
   );
   return hydrated ? (
-    <DrawingSession startPoint={startPoint} onPreview={onPreview} />
+    <DrawingSession
+      startPoint={startPoint}
+      searchAreaRadiusMeters={searchAreaRadiusMeters}
+      onSearchAreaRadiusChange={onSearchAreaRadiusChange}
+      onPreview={onPreview}
+      onGenerated={onGenerated}
+    />
   ) : (
     <p role="status">Preparing your drawing canvas…</p>
   );
@@ -84,10 +102,16 @@ function loadInitialDraft() {
 
 function DrawingSession({
   startPoint,
+  searchAreaRadiusMeters,
+  onSearchAreaRadiusChange,
   onPreview,
+  onGenerated,
 }: {
   startPoint: LngLat | null;
+  searchAreaRadiusMeters: number | null;
+  onSearchAreaRadiusChange: (radiusMeters: number | null) => void;
   onPreview: (geometry: GeoJSONFeatureCollection) => void;
+  onGenerated: (result: RouteGenerationSuccess) => void;
 }) {
   const [initial] = useState(loadInitialDraft);
   const [history, setHistory] = useState<DrawingHistory>(() => ({
@@ -106,8 +130,13 @@ function DrawingSession({
   const [raster, setRaster] = useState<RasterPreview | null>(null);
   const [candidate, setCandidate] = useState<Drawing | null>(null);
   const [busy, setBusy] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [mode, setMode] = useState<ActivityMode>('walking');
+  const [targetDistanceKm, setTargetDistanceKm] = useState('3');
+  const [closeLoop, setCloseLoop] = useState(false);
   const [placementIndex, setPlacementIndex] = useState(0);
   const uploadTicket = useRef(0);
+  const generationController = useRef<AbortController | null>(null);
   const rasterRef = useRef<RasterPreview | null>(null);
   const drawing = history.present;
   const selected =
@@ -137,6 +166,109 @@ function DrawingSession({
       maxScale: 1.2,
     });
   }, [drawing, startPoint]);
+
+  useEffect(() => () => generationController.current?.abort(), []);
+
+  async function generateStreetRoute() {
+    if (!startPoint || !selected) {
+      setFeedback({
+        error: true,
+        text: 'Choose a start point and one stroke first.',
+      });
+      return;
+    }
+    const candidate = placements[placementIndex];
+    if (!candidate) {
+      setFeedback({
+        error: true,
+        text: 'Create a drawing placement before routing.',
+      });
+      return;
+    }
+    generationController.current?.abort();
+    const controller = new AbortController();
+    generationController.current = controller;
+    setGenerating(true);
+    setFeedback({ error: false, text: 'Finding a connected street route…' });
+    try {
+      const response = await fetch('/api/v1/generate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          drawing: { ...drawing, strokes: [selected] },
+          center: startPoint,
+          mode,
+          targetDistanceKm: Number(targetDistanceKm),
+          loop: closeLoop || selected.closed,
+          bounds: {
+            radiusMeters: Math.min(
+              50_000,
+              Math.max(
+                1500,
+                (searchAreaRadiusMeters ?? 0) +
+                  Number(targetDistanceKm) * 1200 +
+                  (searchAreaRadiusMeters === null
+                    ? Math.hypot(
+                        candidate.offsetEastMeters,
+                        candidate.offsetNorthMeters,
+                      )
+                    : 0) +
+                  100,
+              ),
+            ),
+            continuityToleranceMeters: 2,
+          },
+          settings: {
+            maxWaypoints: 8,
+            seed: `${drawing.name}:${selected.id}:${placementIndex}`,
+            placement: {
+              rotationDegrees: candidate.rotationDegrees,
+              scale: candidate.scale,
+              offsetEastMeters: candidate.offsetEastMeters,
+              offsetNorthMeters: candidate.offsetNorthMeters,
+            },
+            ...(searchAreaRadiusMeters === null
+              ? {}
+              : {
+                  searchArea: {
+                    radiusMeters: searchAreaRadiusMeters,
+                    candidateCount: 8,
+                  },
+                }),
+          },
+        }),
+      });
+      const result = routeGenerationResponseSchema.safeParse(
+        await response.json().catch(() => null),
+      );
+      if (!result.success) {
+        throw new Error('The route service returned an unreadable response.');
+      }
+      if (result.data.status === 'error') {
+        throw new Error(result.data.message);
+      }
+      onGenerated(result.data);
+      setFeedback({
+        error: false,
+        text: 'Street route generated. Review its distance, similarity, and warnings on the map.',
+      });
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setFeedback({
+        error: true,
+        text:
+          error instanceof Error
+            ? error.message
+            : 'Route generation failed. Check the routing service and try again.',
+      });
+    } finally {
+      if (generationController.current === controller) {
+        generationController.current = null;
+        setGenerating(false);
+      }
+    }
+  }
 
   useEffect(() => {
     const persist = () => {
@@ -406,6 +538,94 @@ function DrawingSession({
                 >
                   Preview target on map <span aria-hidden="true">↗</span>
                 </button>
+                <div className="generation-settings">
+                  <label htmlFor="route-activity">Activity</label>
+                  <select
+                    id="route-activity"
+                    value={mode}
+                    onChange={(event) =>
+                      setMode(activityModeSchema.parse(event.target.value))
+                    }
+                  >
+                    <option value="walking">Walking</option>
+                    <option value="running">Running</option>
+                    <option value="cycling">Cycling</option>
+                  </select>
+                  <label htmlFor="target-distance">Target distance (km)</label>
+                  <input
+                    id="target-distance"
+                    type="number"
+                    min="0.2"
+                    max="20"
+                    step="0.1"
+                    value={targetDistanceKm}
+                    onChange={(event) =>
+                      setTargetDistanceKm(event.target.value)
+                    }
+                  />
+                  <label className="loop-setting" htmlFor="close-route-loop">
+                    <input
+                      id="close-route-loop"
+                      type="checkbox"
+                      checked={closeLoop || (selected?.closed ?? false)}
+                      disabled={selected?.closed ?? false}
+                      onChange={(event) => setCloseLoop(event.target.checked)}
+                    />
+                    Close the route into a loop
+                  </label>
+                  <p className="field-hint">
+                    Closed drawings always route as loops. One stroke is routed
+                    at a time.
+                  </p>
+                  <label className="loop-setting" htmlFor="search-area-toggle">
+                    <input
+                      id="search-area-toggle"
+                      type="checkbox"
+                      checked={searchAreaRadiusMeters !== null}
+                      onChange={(event) =>
+                        onSearchAreaRadiusChange(
+                          event.target.checked ? 2000 : null,
+                        )
+                      }
+                    />
+                    Search for the shape around my chosen area
+                  </label>
+                  {searchAreaRadiusMeters !== null && (
+                    <>
+                      <label htmlFor="search-area-radius">
+                        Search radius around the map pin (km)
+                      </label>
+                      <input
+                        id="search-area-radius"
+                        type="number"
+                        min="0.25"
+                        max="25"
+                        step="0.25"
+                        value={searchAreaRadiusMeters / 1000}
+                        onChange={(event) => {
+                          const radiusMeters =
+                            Number(event.target.value) * 1000;
+                          if (radiusMeters >= 250 && radiusMeters <= 25_000)
+                            onSearchAreaRadiusChange(radiusMeters);
+                        }}
+                      />
+                      <p className="field-hint">
+                        We’ll try 8 positions inside the circle and keep the
+                        best route. The local routing graph must cover the area.
+                      </p>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className="primary-button generate-route-button"
+                    disabled={!selected || generating || busy}
+                    onClick={generateStreetRoute}
+                  >
+                    {generating
+                      ? 'Routing your shape…'
+                      : 'Generate street route'}
+                  </button>
+                </div>
               </>
             ) : (
               <p>

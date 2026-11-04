@@ -8,12 +8,14 @@ test('real MapLibre loads, pans, zooms, and keeps a selected point while resetti
   page.on('pageerror', (error) => errors.push(error.message));
   await mockMapStyle(page);
   await page.goto('/workspace');
-  await expect(page.getByText('Lyon · click to set your start')).toBeVisible();
+  await expect(
+    page.getByText('Map · click to set your area center'),
+  ).toBeVisible();
   await expect(
     page.getByText('Synthetic test geometry — no street data'),
   ).toBeVisible();
   const canvas = page
-    .getByRole('region', { name: 'Interactive Lyon map' })
+    .getByRole('region', { name: 'Interactive map' })
     .locator('canvas');
   await canvas.click({ position: { x: 145, y: 230 } });
   await expect(
@@ -93,15 +95,12 @@ test('local search and coordinates work, including when the map style fails', as
   await expect(
     page.getByRole('status', { name: 'Selected start point', exact: true }),
   ).toContainText('45.757900');
-  await page.getByLabel('Latitude', { exact: true }).fill('4.8357');
-  await page.getByLabel('Longitude', { exact: true }).fill('45.764');
+  await page.getByLabel('Latitude', { exact: true }).fill('42.5063');
+  await page.getByLabel('Longitude', { exact: true }).fill('1.5218');
   await page.getByRole('button', { name: 'Set start point' }).click();
   await expect(
-    page.getByText(/Choose a point inside the Lyon test area/),
-  ).toBeVisible();
-  await expect(
     page.getByRole('status', { name: 'Selected start point', exact: true }),
-  ).toContainText('45.757900');
+  ).toContainText('42.506300° N, 1.521800° E');
   await page.getByLabel('Latitude', { exact: true }).fill('45.77');
   await page.getByLabel('Longitude', { exact: true }).fill('4.84');
   await page.getByRole('button', { name: 'Set start point' }).click();
@@ -111,7 +110,9 @@ test('local search and coordinates work, including when the map style fails', as
   await page.unroute('**/__test__/map-style.json');
   await mockMapStyle(page);
   await page.getByRole('button', { name: 'Retry map' }).click();
-  await expect(page.getByText('Lyon · click to set your start')).toBeVisible();
+  await expect(
+    page.getByText('Map · click to set your area center'),
+  ).toBeVisible();
   await expect(
     page.getByRole('status', { name: 'Selected start point', exact: true }),
   ).toContainText('45.770000');

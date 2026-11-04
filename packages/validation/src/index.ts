@@ -126,3 +126,111 @@ export const drawingDraftSchema = z
     selectedStrokeId: z.string().max(80).nullable(),
   })
   .strict();
+
+export const routeGenerationRequestSchema = z
+  .object({
+    drawing: drawingSchema,
+    center: lngLatSchema,
+    mode: activityModeSchema,
+    targetDistanceKm: z.number().finite().min(0.2).max(20),
+    loop: z.boolean(),
+    bounds: z
+      .object({
+        radiusMeters: z.number().finite().min(100).max(50_000),
+        continuityToleranceMeters: z.number().finite().min(0.25).max(20),
+      })
+      .strict(),
+    settings: z
+      .object({
+        maxWaypoints: z.number().int().min(2).max(32),
+        seed: z.string().min(1).max(120),
+        placement: z
+          .object({
+            rotationDegrees: z.number().finite().min(-180).max(180),
+            scale: z.number().finite().min(0.5).max(2),
+            offsetEastMeters: z.number().finite().min(-50_000).max(50_000),
+            offsetNorthMeters: z.number().finite().min(-50_000).max(50_000),
+          })
+          .strict(),
+        searchArea: z
+          .object({
+            radiusMeters: z.number().finite().min(250).max(25_000),
+            candidateCount: z.number().int().min(2).max(16),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
+const routeGenerationErrorCodeSchema = z.enum([
+  'invalid_request',
+  'invalid_drawing',
+  'unsupported_multistroke',
+  'infeasible_waypoint',
+  'no_route',
+  'missing_region',
+  'engine_down',
+  'timeout',
+  'cancelled',
+  'route_discontinuity',
+  'invalid_response',
+]);
+
+export const routeGenerationSuccessSchema = z
+  .object({
+    status: z.literal('success'),
+    targetGeometry: z
+      .object({
+        type: z.literal('LineString'),
+        coordinates: z.array(lngLatSchema).min(2),
+      })
+      .strict(),
+    route: z
+      .object({
+        type: z.literal('Feature'),
+        properties: z.object({ mode: activityModeSchema }).strict(),
+        geometry: z
+          .object({
+            type: z.literal('LineString'),
+            coordinates: z.array(lngLatSchema).min(2),
+          })
+          .strict(),
+      })
+      .strict(),
+    distanceMeters: z.number().finite().positive(),
+    requestedDistanceMeters: z.number().finite().positive(),
+    similarityScore: z.number().finite().min(0).max(1),
+    waypointCount: z.number().int().min(2).max(32),
+    warnings: z.array(z.string().min(1)),
+  })
+  .strict();
+
+export const routeGenerationFailureSchema = z
+  .object({
+    status: z.literal('error'),
+    code: routeGenerationErrorCodeSchema,
+    message: z.string().min(1),
+    waypointIndex: z.number().int().min(0).optional(),
+    warnings: z.array(z.string().min(1)),
+  })
+  .strict();
+
+export const routeGenerationResponseSchema = z.discriminatedUnion('status', [
+  routeGenerationSuccessSchema,
+  routeGenerationFailureSchema,
+]);
+
+export type RouteGenerationRequest = z.infer<
+  typeof routeGenerationRequestSchema
+>;
+export type RouteGenerationSuccess = z.infer<
+  typeof routeGenerationSuccessSchema
+>;
+export type RouteGenerationFailure = z.infer<
+  typeof routeGenerationFailureSchema
+>;
+export type RouteGenerationResponse = z.infer<
+  typeof routeGenerationResponseSchema
+>;

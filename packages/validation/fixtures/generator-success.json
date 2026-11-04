@@ -1,0 +1,28 @@
+{
+  "status": "success",
+  "targetGeometry": {
+    "type": "LineString",
+    "coordinates": [
+      [1.5218, 42.5063],
+      [1.522, 42.5065]
+    ]
+  },
+  "route": {
+    "type": "Feature",
+    "properties": { "mode": "walking" },
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [1.5218, 42.5063],
+        [1.522, 42.5065]
+      ]
+    }
+  },
+  "distanceMeters": 1200,
+  "requestedDistanceMeters": 3000,
+  "similarityScore": 0.72,
+  "waypointCount": 8,
+  "warnings": [
+    "Routed distance differs from the requested distance by more than 20%."
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "status": "error",
+  "code": "missing_region",
+  "message": "No routing graph covers one of these waypoints.",
+  "waypointIndex": 3,
+  "warnings": []
+}
