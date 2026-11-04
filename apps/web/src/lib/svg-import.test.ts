@@ -19,6 +19,19 @@ describe('restricted SVG import', () => {
       result.strokes[0]?.points.at(-1),
     );
   });
+  it.each([
+    'heart.svg',
+    'circle.svg',
+    'letter.svg',
+    'open-stroke.svg',
+    'figure-eight.svg',
+  ])('imports canonical geographic fixture %s', (filename) => {
+    const result = importSvg(
+      readFileSync(resolve(`tests/fixtures/drawing/${filename}`), 'utf8'),
+    );
+    expect(drawingSchema.safeParse(result).success).toBe(true);
+    expect(result.strokes).toHaveLength(1);
+  });
   it('keeps path elements and multiple move commands as distinct ordered strokes', () => {
     const result = importSvg(
       wrap(

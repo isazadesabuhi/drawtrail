@@ -2,17 +2,25 @@
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
   type ChangeEvent,
 } from 'react';
 import Image from 'next/image';
-import type { Drawing, DrawingStroke } from '@drawtrail/types';
+import type {
+  Drawing,
+  DrawingStroke,
+  GeoJSONFeatureCollection,
+  LngLat,
+} from '@drawtrail/types';
 import {
   changeDrawing,
+  drawingToGeoJSON,
   drawingPreset,
   emptyDrawing,
+  generatePlacementCandidates,
   redoDrawing,
   resampleStroke,
   simplifyStroke,
@@ -43,14 +51,20 @@ const presets: readonly PresetName[] = [
   'letter',
 ];
 
-export function DrawingEditor() {
+export function DrawingEditor({
+  startPoint = null,
+  onPreview = () => {},
+}: {
+  startPoint?: LngLat | null;
+  onPreview?: (geometry: GeoJSONFeatureCollection) => void;
+}) {
   const hydrated = useSyncExternalStore(
     subscribe,
     clientSnapshot,
     serverSnapshot,
   );
   return hydrated ? (
-    <DrawingSession />
+    <DrawingSession startPoint={startPoint} onPreview={onPreview} />
   ) : (
     <p role="status">Preparing your drawing canvas…</p>
   );
@@ -68,7 +82,13 @@ function loadInitialDraft() {
   }
 }
 
-function DrawingSession() {
+function DrawingSession({
+  startPoint,
+  onPreview,
+}: {
+  startPoint: LngLat | null;
+  onPreview: (geometry: GeoJSONFeatureCollection) => void;
+}) {
   const [initial] = useState(loadInitialDraft);
   const [history, setHistory] = useState<DrawingHistory>(() => ({
     past: [],
@@ -86,6 +106,7 @@ function DrawingSession() {
   const [raster, setRaster] = useState<RasterPreview | null>(null);
   const [candidate, setCandidate] = useState<Drawing | null>(null);
   const [busy, setBusy] = useState(false);
+  const [placementIndex, setPlacementIndex] = useState(0);
   const uploadTicket = useRef(0);
   const rasterRef = useRef<RasterPreview | null>(null);
   const drawing = history.present;
@@ -93,6 +114,29 @@ function DrawingSession() {
     drawing.strokes.find((stroke) => stroke.id === selectedId) ??
     drawing.strokes[0] ??
     null;
+  const placements = useMemo(() => {
+    if (!startPoint || !drawing.strokes.length) return [];
+    return generatePlacementCandidates({
+      seed: JSON.stringify({
+        name: drawing.name,
+        strokes: drawing.strokes.map(({ closed, points }) => ({
+          closed,
+          points,
+        })),
+      }),
+      count: 12,
+      bounds: {
+        minEastMeters: -150,
+        maxEastMeters: 150,
+        minNorthMeters: -150,
+        maxNorthMeters: 150,
+      },
+      minRotationDegrees: -30,
+      maxRotationDegrees: 30,
+      minScale: 0.8,
+      maxScale: 1.2,
+    });
+  }, [drawing, startPoint]);
 
   useEffect(() => {
     const persist = () => {
@@ -312,6 +356,63 @@ function DrawingSession() {
             <p className="field-hint">
               Presets replace the current drawing. Undo brings it back.
             </p>
+          </section>
+          <section
+            className="drawing-tool-card placement-tool-card"
+            aria-labelledby="placement-title"
+          >
+            <h3 id="placement-title">Place it near your start</h3>
+            {startPoint ? (
+              <>
+                <p>
+                  Try one of 12 repeatable placements, fitted inside an 800 m
+                  square. This is a target preview; it is not snapped to
+                  streets.
+                </p>
+                <div className="placement-actions">
+                  <span aria-live="polite">
+                    Candidate {placementIndex + 1} of {placements.length}
+                  </span>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() =>
+                      setPlacementIndex(
+                        (index) => (index + 1) % placements.length,
+                      )
+                    }
+                    disabled={!placements.length}
+                  >
+                    Try another placement
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={!drawing.strokes.length || !placements.length}
+                  onClick={() => {
+                    const candidate = placements[placementIndex]!;
+                    onPreview(
+                      drawingToGeoJSON(drawing, startPoint, {
+                        widthMeters: 800,
+                        heightMeters: 800,
+                        scale: candidate.scale,
+                        rotationDegrees: candidate.rotationDegrees,
+                        offsetEastMeters: candidate.offsetEastMeters,
+                        offsetNorthMeters: candidate.offsetNorthMeters,
+                      }),
+                    );
+                  }}
+                >
+                  Preview target on map <span aria-hidden="true">↗</span>
+                </button>
+              </>
+            ) : (
+              <p>
+                Choose a start point in the place step before previewing the
+                drawing on the map.
+              </p>
+            )}
           </section>
           <details className="drawing-tool-card" open>
             <summary>Move & shape</summary>

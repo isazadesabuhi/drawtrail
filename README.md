@@ -2,7 +2,7 @@
 
 A local-first GPS art app: turn a simple drawing into a connected walking, running, or cycling route on real streets.
 
-This checkout includes **Phase 03: drawing and image inputs**, alongside the Lyon map workspace. At `/workspace`, choose a starting location, then select **Draw your idea** for freehand/keyboard drawing, presets, SVG import, raster previews, silhouette tracing, transforms, stroke ordering, undo/redo, and local draft saving. Geographic placement, routing and exports are later milestones. Drawings and the homepage artwork are target art, not navigable routes.
+This checkout includes **Phase 04: geographic drawing placement** alongside the Lyon map workspace. At `/workspace`, choose a starting location, then draw or import a shape, try deterministic nearby placements, and preview the target geometry on the map. The map keeps the target drawing separate from the future street-route overlay. Street-network routing and exports are later milestones. Drawings and the homepage artwork are target art, not navigable routes.
 
 ## Requirements
 
@@ -67,6 +67,8 @@ No variables are required for Gate A. `apps/web/.env.example` documents the opti
 Interactive development uses attributed OSM standard tiles by default. Production requires `NEXT_PUBLIC_MAP_STYLE_URL` and `NEXT_PUBLIC_MAP_ATTRIBUTION`; without them, coordinate selection still works and the map shows a configuration message. See [map development](docs/development/maps.md) for provider setup, service usage limits, search abstraction, coordinate conventions, and fixture-based tests. The start point stays in editor state while switching stages; map locations reset on reload.
 
 Drawing drafts now survive reloads on the same browser/device. The map location and uploaded image files are not persisted. See [drawing inputs](docs/algorithm/drawing-inputs.md) for supported SVG geometry, file/model limits, keyboard shortcuts, stroke semantics, tracing limitations and privacy. PNG/JPEG import initially provides a preview; only an explicitly reviewed outline replaces the drawing.
+
+Geographic placement uses a local East/North metric projection and deterministic candidate generation. See [geographic placement](docs/algorithm/geographic-placement.md) for projection limits, footprint semantics, validation warnings and overlay colors.
 
 ## Layout
 

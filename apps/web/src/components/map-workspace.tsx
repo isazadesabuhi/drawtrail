@@ -7,9 +7,9 @@ import {
   useState,
   type FormEvent,
 } from 'react';
-import type { LngLat } from '@drawtrail/types';
-import { LYON_CENTER, LYON_ZOOM, isInsideLyon } from '@drawtrail/geo-utils';
-import { lngLatSchema } from '@drawtrail/validation';
+import type { GeoJSONFeatureCollection, LngLat } from '@drawtrail/types';
+import { LYON_CENTER, LYON_ZOOM } from '@drawtrail/geo-utils';
+import { lyonLngLatSchema } from '@drawtrail/validation';
 import {
   localGeocoder,
   type Geocoder,
@@ -18,6 +18,11 @@ import {
 import type { MapConfiguration } from '../lib/map-config';
 import { MapCanvas, type ViewRequest } from './map-canvas';
 import { DrawingEditor } from './drawing-editor';
+
+const EMPTY_FEATURES: GeoJSONFeatureCollection = {
+  type: 'FeatureCollection',
+  features: [],
+};
 
 export function MapWorkspace({
   configuration,
@@ -29,6 +34,8 @@ export function MapWorkspace({
   const [stage, setStage] = useState<'place' | 'draw'>('place');
   const [drawingVisited, setDrawingVisited] = useState(false);
   const [startPoint, setStartPoint] = useState<LngLat | null>(null);
+  const [targetGeometry, setTargetGeometry] =
+    useState<GeoJSONFeatureCollection>(EMPTY_FEATURES);
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [selectionError, setSelectionError] = useState('');
@@ -47,13 +54,14 @@ export function MapWorkspace({
   useEffect(() => () => searchController.current?.abort(), []);
 
   const selectPoint = useCallback((point: LngLat): boolean => {
-    if (!lngLatSchema.safeParse(point).success || !isInsideLyon(point)) {
+    if (!lyonLngLatSchema.safeParse(point).success) {
       setSelectionError(
         'Choose a point inside the Lyon test area: latitude 45.63–45.90, longitude 4.65–5.02.',
       );
       return false;
     }
     setSelectionError('');
+    setTargetGeometry(EMPTY_FEATURES);
     setStartPoint(point);
     setLatitude(point[1].toFixed(6));
     setLongitude(point[0].toFixed(6));
@@ -302,6 +310,7 @@ export function MapWorkspace({
                     type="button"
                     onClick={() => {
                       setStartPoint(null);
+                      setTargetGeometry(EMPTY_FEATURES);
                       setLatitude('');
                       setLongitude('');
                       setSelectionError('');
@@ -352,7 +361,20 @@ export function MapWorkspace({
               startPoint={startPoint}
               view={view}
               onSelect={selectPoint}
+              targetGeometry={targetGeometry}
+              routeGeometry={EMPTY_FEATURES}
             />
+            {targetGeometry.features.length > 0 && (
+              <div className="geometry-legend" aria-label="Map geometry legend">
+                <span>
+                  <i className="target-legend-swatch" /> Target drawing
+                </span>
+                <span>
+                  <i className="route-legend-swatch" /> Actual street route (not
+                  generated yet)
+                </span>
+              </div>
+            )}
             <div className="map-attribution">
               <span>
                 {configuration.mode === 'development' ? (
@@ -396,7 +418,17 @@ export function MapWorkspace({
           saved on this device; the map location is not saved across reloads.
         </p>
       </div>
-      <div hidden={stage !== 'draw'}>{drawingVisited && <DrawingEditor />}</div>
+      <div hidden={stage !== 'draw'}>
+        {drawingVisited && (
+          <DrawingEditor
+            startPoint={startPoint}
+            onPreview={(geometry) => {
+              setTargetGeometry(geometry);
+              setStage('place');
+            }}
+          />
+        )}
+      </div>
     </>
   );
 }

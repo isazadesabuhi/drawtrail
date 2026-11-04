@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Map as LibreMap, Marker } from 'maplibre-gl';
-import type { LngLat } from '@drawtrail/types';
+import type { GeoJSONSource, Map as LibreMap, Marker } from 'maplibre-gl';
+import type { GeoJSONFeatureCollection, LngLat } from '@drawtrail/types';
 import { LYON_BOUNDS, LYON_CENTER, LYON_ZOOM } from '@drawtrail/geo-utils';
 import type { MapConfiguration } from '../lib/map-config';
 
@@ -16,6 +16,17 @@ interface MapCanvasProps {
   startPoint: LngLat | null;
   view: ViewRequest;
   onSelect: (point: LngLat) => boolean;
+  targetGeometry: GeoJSONFeatureCollection;
+  routeGeometry: GeoJSONFeatureCollection;
+}
+
+const TARGET_SOURCE = 'drawtrail-target-geometry';
+const ROUTE_SOURCE = 'drawtrail-route-geometry';
+
+function mutableGeoJSON(data: GeoJSONFeatureCollection) {
+  return JSON.parse(JSON.stringify(data)) as Parameters<
+    GeoJSONSource['setData']
+  >[0];
 }
 
 export function MapCanvas({
@@ -23,12 +34,16 @@ export function MapCanvas({
   startPoint,
   view,
   onSelect,
+  targetGeometry,
+  routeGeometry,
 }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
   const selectedRef = useRef(startPoint);
   const viewRef = useRef(view);
+  const targetGeometryRef = useRef(targetGeometry);
+  const routeGeometryRef = useRef(routeGeometry);
   const syncMarkerRef = useRef<(() => void) | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
@@ -108,6 +123,32 @@ export function MapCanvas({
           );
         map.on('load', () => {
           window.clearTimeout(timeout);
+          map?.addSource(TARGET_SOURCE, {
+            type: 'geojson',
+            data: mutableGeoJSON(targetGeometryRef.current),
+          });
+          map?.addSource(ROUTE_SOURCE, {
+            type: 'geojson',
+            data: mutableGeoJSON(routeGeometryRef.current),
+          });
+          map?.addLayer({
+            id: 'drawtrail-route-line',
+            type: 'line',
+            source: ROUTE_SOURCE,
+            paint: {
+              'line-color': '#426b4d',
+              'line-width': 5,
+              'line-dasharray': [2, 1.5],
+            },
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+          });
+          map?.addLayer({
+            id: 'drawtrail-target-line',
+            type: 'line',
+            source: TARGET_SOURCE,
+            paint: { 'line-color': '#d27143', 'line-width': 4 },
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+          });
           if (!disposed && !sourceFailed) setStatus('ready');
         });
         map.on('error', () => {
@@ -187,6 +228,20 @@ export function MapCanvas({
       pitch: 0,
     });
   }, [view]);
+
+  useEffect(() => {
+    targetGeometryRef.current = targetGeometry;
+    mapRef.current
+      ?.getSource<GeoJSONSource>(TARGET_SOURCE)
+      ?.setData(mutableGeoJSON(targetGeometry));
+  }, [targetGeometry]);
+
+  useEffect(() => {
+    routeGeometryRef.current = routeGeometry;
+    mapRef.current
+      ?.getSource<GeoJSONSource>(ROUTE_SOURCE)
+      ?.setData(mutableGeoJSON(routeGeometry));
+  }, [routeGeometry]);
 
   const unconfigured = configuration.mode === 'unconfigured';
   return (

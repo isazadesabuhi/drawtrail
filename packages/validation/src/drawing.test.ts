@@ -19,18 +19,23 @@ const fixture = {
   ],
 };
 describe('canonical drawing validation', () => {
-  it.each(['heart', 'circle', 'square', 'star', 'letter'])(
-    'validates the fixed %s fixture',
-    (name) => {
-      const fixture = JSON.parse(
-        readFileSync(
-          new URL(`../../geo-utils/fixtures/${name}.json`, import.meta.url),
-          'utf8',
-        ),
-      );
-      expect(drawingSchema.safeParse(fixture).success).toBe(true);
-    },
-  );
+  it.each([
+    'heart',
+    'circle',
+    'square',
+    'star',
+    'letter',
+    'open-stroke',
+    'figure-eight',
+  ])('validates the fixed %s fixture', (name) => {
+    const fixture = JSON.parse(
+      readFileSync(
+        new URL(`../../geo-utils/fixtures/${name}.json`, import.meta.url),
+        'utf8',
+      ),
+    );
+    expect(drawingSchema.safeParse(fixture).success).toBe(true);
+  });
   it('accepts a normalized ordered stroke and an empty editor draft', () => {
     expect(drawingSchema.parse(fixture)).toEqual(fixture);
     expect(drawingSchema.safeParse({ ...fixture, strokes: [] }).success).toBe(

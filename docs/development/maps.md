@@ -1,6 +1,6 @@
 # Map development and provider configuration
 
-Phase 02 adds `/workspace`: a browser-only MapLibre 6.16.0 map, Lyon viewport, native navigation/fullscreen controls, local place catalog, manual coordinate entry, and a draggable start marker. It does not generate a street route or establish routing coverage.
+`/workspace` has a browser-only MapLibre 6.16.0 map, Lyon viewport, native navigation/fullscreen controls, local place catalog, manual coordinate entry, and a draggable start marker. Phase 04 adds a metric target-drawing overlay plus a separately styled empty route overlay source. It still does not generate a street route or establish routing coverage.
 
 ## Interactive local development
 
@@ -18,6 +18,8 @@ NEXT_PUBLIC_MAP_ATTRIBUTION=© OpenStreetMap contributors · Your provider
 ```
 
 A same-origin path such as `/maps/style.json` is supported. The style must be a MapLibre style with accessible tiles and correct source attribution. The credit text is rendered as plain text; HTML is not executed. Provider settings are public browser configuration. Use a provider/hosting arrangement whose terms and attribution meet the intended traffic and usage; choosing a paid service or deployment is outside this phase.
+
+The selected drawing can be previewed around the start point. Its strokes are transformed in local metric coordinates and rendered as WGS84 GeoJSON. The target uses a solid clay line; the future route source uses a dashed forest-green line. The legend says when the street route has not been generated. The start point stays in editor state while switching stages; map locations reset on reload.
 
 `pnpm build` has no public/demo tile fallback. Without both settings, the production workspace explains that maps are unconfigured, and manual coordinates/local place selection remain usable. Invalid or partial settings use this same fallback. Changing these settings requires rebuilding because the workspace is prerendered.
 

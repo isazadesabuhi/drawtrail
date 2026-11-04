@@ -269,43 +269,43 @@
 
 ## Phase 04 — Geographic geometry foundation (P0)
 
-### [ ] 04-01 — Define GeoJSON and coordinate conventions
+### [x] 04-01 — Define GeoJSON and coordinate conventions
 
 **Scope:** Use WGS84 [longitude, latitude] at boundaries and projected metric coordinates internally.
 
 **Acceptance:** Validation rejects swapped/out-of-range values.
 
-### [ ] 04-02 — Implement geographic projection utilities
+### [x] 04-02 — Implement geographic projection utilities
 
 **Scope:** Select suitable local metric projection or geodesic approach and expose reversible transforms.
 
 **Acceptance:** Round-trip fixture tolerance documented and tested.
 
-### [ ] 04-03 — Transform normalized strokes to map footprint
+### [x] 04-03 — Transform normalized strokes to map footprint
 
 **Scope:** Fit drawing within metric bounding box while preserving aspect ratio.
 
 **Acceptance:** A 1 km square stays proportionate at test latitude.
 
-### [ ] 04-04 — Add scale/rotation/translation candidate generation
+### [x] 04-04 — Add scale/rotation/translation candidate generation
 
 **Scope:** Generate seeded placements within allowed search bounds.
 
 **Acceptance:** Candidate list deterministic for same seed.
 
-### [ ] 04-05 — Implement geometry validity checks
+### [x] 04-05 — Implement geometry validity checks
 
 **Scope:** Check NaN, duplicate points, degenerate shapes, self-intersections as informational where appropriate.
 
 **Acceptance:** Invalid geometry returns typed errors.
 
-### [ ] 04-06 — Build route overlay preview
+### [x] 04-06 — Build route overlay preview
 
 **Scope:** Show target drawing and later snapped route as separate colored GeoJSON layers.
 
 **Acceptance:** Legend distinguishes target vs actual path.
 
-### [ ] 04-07 — Create geometry fixtures
+### [x] 04-07 — Create geometry fixtures
 
 **Scope:** Store canonical SVG/JSON fixtures for heart, circle, letter, open stroke, figure-eight.
 
@@ -944,149 +944,149 @@ Updated 2026-11-04. Work resumed at the user's request, phase by phase with test
 
 Phase 00 documentation was reviewed against each acceptance criterion. Registry integrity is checked with `node tools/check-backlog.mjs`. Phase 01 passed local installation, formatting, lint, typecheck, unit/component tests, build, and desktop/mobile smoke. Hosted CI execution remains in review (01-10). Dependencies for future phases remain as documented above and will be refined when their phase begins.
 
-| ID    | Status | Dependencies                 | Evidence / next action                                                                                                                                |
-| ----- | ------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 00-01 | done   | —                            | docs/product/scope.md; scope and exclusions reviewed.                                                                                                 |
-| 00-02 | done   | 00-01                        | docs/product/journeys.md; observable success for every MVP journey.                                                                                   |
-| 00-03 | done   | 00-02                        | docs/algorithm/metrics.md; formulas, units, initial targets, tests.                                                                                   |
-| 00-04 | done   | 00-03                        | docs/adr/0001-architecture.md; decisions, trade-offs, alternatives, revision triggers.                                                                |
-| 00-05 | done   | 00-04                        | CONTRIBUTING.md; workflow and definition of done.                                                                                                     |
-| 00-06 | done   | 00-05                        | Full registry below; tools/check-backlog.mjs checks completeness.                                                                                     |
-| 01-01 | done   | 00-06                        | pnpm 11.25.0 lockfile; fresh frozen offline install passes (443 packages, zero downloads).                                                            |
-| 01-02 | done   | 01-01                        | Next.js/Tailwind home; production build and desktop/mobile browser smoke pass.                                                                        |
-| 01-03 | done   | 01-02                        | Four shared package exports; web imports types and validation via workspace links.                                                                    |
-| 01-04 | done   | 01-03                        | Root strict typecheck passes across packages, web, and test configuration.                                                                            |
-| 01-05 | done   | 01-04                        | ESLint has zero warnings; Prettier format check passes.                                                                                               |
-| 01-06 | done   | 01-05                        | Vitest pure validation tests pass as part of 13-test suite.                                                                                           |
-| 01-07 | done   | 01-06                        | Testing Library activity interaction test passes.                                                                                                     |
-| 01-08 | done   | 01-07                        | Two production Playwright smoke tests pass: desktop and mobile viewport.                                                                              |
-| 01-09 | done   | 01-08                        | Optional, required, valid and rejected URL configuration tested without secret output.                                                                |
-| 01-10 | review | 01-09                        | Workflow configured; local negative lint/test fixtures exit 1. Remote now exists; hosted CI status unverified.                                        |
-| 01-11 | done   | 01-01                        | README documents locked install, startup, checks, browser fallback, Windows/WSL; clean install verified.                                              |
-| 01-12 | done   | 01-05, 01-08                 | Tailwind regression, explicit base, stable Webpack dev command; 45 unit/component and 6 dev browser tests pass. See docs/progress/dev-startup-fix.md. |
-| 02-01 | done   | 01-02, 01-05                 | Responsive /workspace and shared header; desktop/mobile browser screenshots and overflow checks pass.                                                 |
-| 02-02 | done   | 02-01                        | Browser-only MapLibre 6.16.0, bundled worker, real-renderer browser tests; mocked cleanup passes.                                                     |
-| 02-03 | done   | 02-02                        | Configurable style/credit, visible attribution, development-only OSM tiles; docs/development/maps.md.                                                 |
-| 02-04 | done   | 02-02                        | Lyon center/bounds and Back to Lyon reset tested; selected point stays unchanged.                                                                     |
-| 02-05 | done   | 02-04                        | Pointer/keyboard zoom and compass reset, supported fullscreen enter/exit verified in browser tests.                                                   |
-| 02-06 | done   | 02-04                        | Cancellable provider interface, local catalog, disabled-provider and coordinate fallback tests pass.                                                  |
-| 02-07 | done   | 02-06                        | Click, drag, manual and place selection update one editor state; coordinate order/invalid drag tested.                                                |
-| 02-08 | done   | 02-03, 02-05, 02-07          | 44 unit/component tests and 6 desktop/mobile E2E tests pass; failures/retry covered with fixtures.                                                    |
-| 03-01 | done   | 02-07                        | Drawing/ordered stroke types and bounded versioned Zod schemas; all fixed preset fixtures validate.                                                   |
-| 03-02 | done   | 03-01                        | SVG canvas records normalized mouse/touch strokes with cursor feedback; real browser journeys pass.                                                   |
-| 03-03 | done   | 03-02                        | 50-snapshot undo/redo and clear; multiple-stroke, branching and clear/restore tests pass.                                                             |
-| 03-04 | done   | 03-03                        | Deterministic heart, circle, square, star and single-stroke M; fixed JSON fixtures match.                                                             |
-| 03-05 | done   | 03-04                        | Detached bounded SVG geometry parser; accepted curves/primitives and malicious/unsupported rejection tests pass.                                      |
-| 03-06 | done   | 03-05                        | PNG/JPEG header, byte and pixel limits plus transient previews; real browser PNG/JPEG decoding verified.                                              |
-| 03-07 | done   | 03-06                        | Single connected contour prototype; fixed PNG yields ordered closed outline at expected normalized bounds.                                            |
-| 03-08 | done   | 03-07                        | Explicit ordered stroke list, selection/reorder/reverse/keep-one; no silent connectors; complex contours rejected.                                    |
-| 03-09 | done   | 03-08                        | Iterative RDP and arc-length sampling retain corners/closure; zero-length and loop fixtures tested.                                                   |
-| 03-10 | done   | 03-09                        | Whole-drawing move, rotate, flip, scale; out-of-bounds changes fail without clipping; undo restores geometry.                                         |
-| 03-11 | done   | 03-10                        | Versioned drawing-only local drafts survive reload; corruption, schema mismatch and storage denial tested.                                            |
-| 03-12 | done   | 03-11                        | Keyboard drawing and real emulated touch journeys pass in desktop/mobile browser suites without overflow.                                             |
-| 04-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 04-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 04-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 04-04 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 04-05 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 04-06 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 04-07 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 05-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 05-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 05-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 05-04 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 05-05 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 05-06 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 05-07 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 05-08 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 05-09 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 06-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 06-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 06-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 06-04 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 06-05 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 06-06 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 06-07 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 06-08 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 06-09 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 06-10 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-04 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-05 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-06 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-07 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-08 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-09 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-10 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-11 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-12 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 07-13 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 08-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 08-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 08-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 08-04 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 08-05 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 08-06 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 08-07 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 08-08 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 08-09 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 08-10 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 09-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 09-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 09-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 09-04 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 09-05 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 09-06 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 09-07 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 09-08 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 09-09 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 09-10 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 10-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 10-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 10-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 10-04 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 10-05 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 10-06 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 10-07 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 11-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 11-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 11-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 11-04 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 11-05 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 11-06 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 11-07 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 11-08 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 11-09 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 11-10 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 12-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 12-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 12-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 12-04 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 12-05 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 12-06 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 12-07 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 12-08 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 12-09 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 13-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 13-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 13-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 13-04 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 13-05 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 13-06 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 13-07 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 13-08 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 13-09 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 13-10 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 14-01 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 14-02 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 14-03 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 14-04 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 14-05 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 14-06 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 14-07 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
-| 14-08 | todo   | See phase dependencies above | Not started.                                                                                                                                          |
+| ID    | Status | Dependencies                 | Evidence / next action                                                                                                                                   |
+| ----- | ------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 00-01 | done   | —                            | docs/product/scope.md; scope and exclusions reviewed.                                                                                                    |
+| 00-02 | done   | 00-01                        | docs/product/journeys.md; observable success for every MVP journey.                                                                                      |
+| 00-03 | done   | 00-02                        | docs/algorithm/metrics.md; formulas, units, initial targets, tests.                                                                                      |
+| 00-04 | done   | 00-03                        | docs/adr/0001-architecture.md; decisions, trade-offs, alternatives, revision triggers.                                                                   |
+| 00-05 | done   | 00-04                        | CONTRIBUTING.md; workflow and definition of done.                                                                                                        |
+| 00-06 | done   | 00-05                        | Full registry below; tools/check-backlog.mjs checks completeness.                                                                                        |
+| 01-01 | done   | 00-06                        | pnpm 11.25.0 lockfile; fresh frozen offline install passes (443 packages, zero downloads).                                                               |
+| 01-02 | done   | 01-01                        | Next.js/Tailwind home; production build and desktop/mobile browser smoke pass.                                                                           |
+| 01-03 | done   | 01-02                        | Four shared package exports; web imports types and validation via workspace links.                                                                       |
+| 01-04 | done   | 01-03                        | Root strict typecheck passes across packages, web, and test configuration.                                                                               |
+| 01-05 | done   | 01-04                        | ESLint has zero warnings; Prettier format check passes.                                                                                                  |
+| 01-06 | done   | 01-05                        | Vitest pure validation tests pass as part of 13-test suite.                                                                                              |
+| 01-07 | done   | 01-06                        | Testing Library activity interaction test passes.                                                                                                        |
+| 01-08 | done   | 01-07                        | Two production Playwright smoke tests pass: desktop and mobile viewport.                                                                                 |
+| 01-09 | done   | 01-08                        | Optional, required, valid and rejected URL configuration tested without secret output.                                                                   |
+| 01-10 | review | 01-09                        | Workflow configured; local negative lint/test fixtures exit 1. Remote now exists; hosted CI status unverified.                                           |
+| 01-11 | done   | 01-01                        | README documents locked install, startup, checks, browser fallback, Windows/WSL; clean install verified.                                                 |
+| 01-12 | done   | 01-05, 01-08                 | Tailwind regression, explicit base, stable Webpack dev command; 45 unit/component and 6 dev browser tests pass. See docs/progress/dev-startup-fix.md.    |
+| 02-01 | done   | 01-02, 01-05                 | Responsive /workspace and shared header; desktop/mobile browser screenshots and overflow checks pass.                                                    |
+| 02-02 | done   | 02-01                        | Browser-only MapLibre 6.16.0, bundled worker, real-renderer browser tests; mocked cleanup passes.                                                        |
+| 02-03 | done   | 02-02                        | Configurable style/credit, visible attribution, development-only OSM tiles; docs/development/maps.md.                                                    |
+| 02-04 | done   | 02-02                        | Lyon center/bounds and Back to Lyon reset tested; selected point stays unchanged.                                                                        |
+| 02-05 | done   | 02-04                        | Pointer/keyboard zoom and compass reset, supported fullscreen enter/exit verified in browser tests.                                                      |
+| 02-06 | done   | 02-04                        | Cancellable provider interface, local catalog, disabled-provider and coordinate fallback tests pass.                                                     |
+| 02-07 | done   | 02-06                        | Click, drag, manual and place selection update one editor state; coordinate order/invalid drag tested.                                                   |
+| 02-08 | done   | 02-03, 02-05, 02-07          | 44 unit/component tests and 6 desktop/mobile E2E tests pass; failures/retry covered with fixtures.                                                       |
+| 03-01 | done   | 02-07                        | Drawing/ordered stroke types and bounded versioned Zod schemas; all fixed preset fixtures validate.                                                      |
+| 03-02 | done   | 03-01                        | SVG canvas records normalized mouse/touch strokes with cursor feedback; real browser journeys pass.                                                      |
+| 03-03 | done   | 03-02                        | 50-snapshot undo/redo and clear; multiple-stroke, branching and clear/restore tests pass.                                                                |
+| 03-04 | done   | 03-03                        | Deterministic heart, circle, square, star and single-stroke M; fixed JSON fixtures match.                                                                |
+| 03-05 | done   | 03-04                        | Detached bounded SVG geometry parser; accepted curves/primitives and malicious/unsupported rejection tests pass.                                         |
+| 03-06 | done   | 03-05                        | PNG/JPEG header, byte and pixel limits plus transient previews; real browser PNG/JPEG decoding verified.                                                 |
+| 03-07 | done   | 03-06                        | Single connected contour prototype; fixed PNG yields ordered closed outline at expected normalized bounds.                                               |
+| 03-08 | done   | 03-07                        | Explicit ordered stroke list, selection/reorder/reverse/keep-one; no silent connectors; complex contours rejected.                                       |
+| 03-09 | done   | 03-08                        | Iterative RDP and arc-length sampling retain corners/closure; zero-length and loop fixtures tested.                                                      |
+| 03-10 | done   | 03-09                        | Whole-drawing move, rotate, flip, scale; out-of-bounds changes fail without clipping; undo restores geometry.                                            |
+| 03-11 | done   | 03-10                        | Versioned drawing-only local drafts survive reload; corruption, schema mismatch and storage denial tested.                                               |
+| 03-12 | done   | 03-11                        | Keyboard drawing and real emulated touch journeys pass in desktop/mobile browser suites without overflow.                                                |
+| 04-01 | done   | 03-12                        | Shared WGS84/GeoJSON types, global coordinate checks, and Lyon-area order validator reject swapped/out-of-range inputs.                                  |
+| 04-02 | done   | 04-01                        | Documented reversible local East/North equirectangular projection; Lyon round-trip error tested below 1 mm.                                              |
+| 04-03 | done   | 04-02                        | Normalized strokes fit metric extents proportionally; 1 km square and degenerate-axis fixtures pass.                                                     |
+| 04-04 | done   | 04-03                        | Seeded translation/rotation/scale generator is deterministic and constrains every candidate to explicit bounds.                                          |
+| 04-05 | done   | 04-04                        | Typed errors cover invalid geometry; self-crossings remain informational warnings, including the figure-eight fixture.                                   |
+| 04-06 | done   | 04-05                        | Separate GeoJSON target and actual-route sources/layers use distinct colors and a visible target/route legend; route remains empty until routing exists. |
+| 04-07 | done   | 04-06                        | Canonical heart/circle/letter/open-stroke/figure-eight SVG and JSON fixtures pass unit validation and browser import journeys.                           |
+| 05-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 05-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 05-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 05-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 05-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 05-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 05-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 05-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 05-09 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 06-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 06-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 06-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 06-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 06-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 06-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 06-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 06-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 06-09 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 06-10 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-09 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-10 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-11 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-12 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-13 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 08-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 08-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 08-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 08-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 08-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 08-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 08-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 08-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 08-09 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 08-10 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 09-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 09-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 09-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 09-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 09-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 09-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 09-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 09-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 09-09 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 09-10 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 10-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 10-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 10-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 10-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 10-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 10-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 10-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 11-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 11-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 11-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 11-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 11-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 11-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 11-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 11-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 11-09 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 11-10 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 12-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 12-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 12-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 12-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 12-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 12-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 12-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 12-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 12-09 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 13-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 13-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 13-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 13-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 13-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 13-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 13-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 13-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 13-09 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 13-10 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 14-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 14-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 14-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 14-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 14-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 14-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 14-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 14-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
 
 ### Decisions and changes
 
@@ -1102,3 +1102,5 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 - 2026-11-04: Added task 01-12 for the observed local development startup failure. Existing IDs and acceptance criteria are unchanged. Tailwind/PostCSS updated together, dev mode uses Webpack, and CI now exercises development browser journeys. See docs/progress/dev-startup-fix.md.
 
 - 2026-11-04: Phase 03 implemented and verified locally: 99 unit/component tests, 16 development and 16 production browser checks. See docs/progress/phase-03.md and docs/algorithm/drawing-inputs.md for limits and evidence. Drawing drafts exclude map location/image files. No task IDs or acceptance criteria changed; Phase 04 is next.
+
+- 2026-11-04: Phase 04 geographic placement foundations implemented. Metric projection, proportion-preserving footprints, seeded placements, geometry validation, separate MapLibre target/actual-route layers, and canonical fixtures verified. Route layer is intentionally empty pending routing. See docs/progress/phase-04.md and docs/algorithm/geographic-placement.md.

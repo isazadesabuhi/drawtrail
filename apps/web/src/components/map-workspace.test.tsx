@@ -23,6 +23,9 @@ interface FakeMap {
   remove: ReturnType<typeof vi.fn>;
   jumpTo: ReturnType<typeof vi.fn>;
   addControl: ReturnType<typeof vi.fn>;
+  addSource: ReturnType<typeof vi.fn>;
+  addLayer: ReturnType<typeof vi.fn>;
+  getSource: ReturnType<typeof vi.fn>;
 }
 interface FakeMarker {
   point: Point;
@@ -32,6 +35,10 @@ interface FakeMarker {
 const engine = vi.hoisted(() => ({
   maps: [] as FakeMap[],
   markers: [] as FakeMarker[],
+  sources: new Map<
+    string,
+    { data: unknown; setData: ReturnType<typeof vi.fn> }
+  >(),
   fail: false,
 }));
 
@@ -42,6 +49,11 @@ vi.mock('maplibre-gl', () => {
     handlers: Record<string, ((event: EventData) => void)[]> = {};
     canvas = document.createElement('canvas');
     addControl = vi.fn();
+    addLayer = vi.fn();
+    addSource = vi.fn((id: string, source: { data: unknown }) => {
+      engine.sources.set(id, { data: source.data, setData: vi.fn() });
+    });
+    getSource = vi.fn((id: string) => engine.sources.get(id));
     remove = vi.fn(() => this.canvas.remove());
     resize = vi.fn();
     jumpTo = vi.fn(({ center, zoom }: { center: Point; zoom: number }) => {
@@ -144,6 +156,7 @@ function enterCoordinates(latitude: string, longitude: string) {
 beforeEach(() => {
   engine.maps.length = 0;
   engine.markers.length = 0;
+  engine.sources.clear();
   engine.fail = false;
   vi.clearAllMocks();
 });
@@ -158,6 +171,26 @@ describe('map workspace with a mocked renderer', () => {
     expect(map.zoom).toBe(LYON_ZOOM);
     expect(map.addControl).toHaveBeenCalledTimes(2);
     act(() => map.emit('load'));
+    expect(map.addSource).toHaveBeenCalledWith(
+      'drawtrail-target-geometry',
+      expect.objectContaining({ type: 'geojson' }),
+    );
+    expect(map.addSource).toHaveBeenCalledWith(
+      'drawtrail-route-geometry',
+      expect.objectContaining({ type: 'geojson' }),
+    );
+    expect(map.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'drawtrail-route-line',
+        source: 'drawtrail-route-geometry',
+      }),
+    );
+    expect(map.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'drawtrail-target-line',
+        source: 'drawtrail-target-geometry',
+      }),
+    );
     expect(
       screen.getByText('Lyon · click to set your start'),
     ).toBeInTheDocument();
@@ -167,6 +200,40 @@ describe('map workspace with a mocked renderer', () => {
     page.unmount();
     expect(marker.remove).toHaveBeenCalledOnce();
     expect(map.remove).toHaveBeenCalledOnce();
+  });
+
+  it('previews the selected drawing on the map using a distinct target source', async () => {
+    render(<MapWorkspace configuration={configuration} />);
+    const map = await mountedMap();
+    act(() => map.emit('load'));
+    enterCoordinates('45.764', '4.8357');
+    fireEvent.click(screen.getByRole('button', { name: /Draw your idea/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
+    expect(screen.getByText('Candidate 1 of 12')).toBeVisible();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Try another placement' }),
+    );
+    expect(screen.getByText('Candidate 2 of 12')).toBeVisible();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Preview target on map' }),
+    );
+    expect(screen.getByLabelText('Map geometry legend')).toBeVisible();
+    expect(screen.getByText('Target drawing')).toBeVisible();
+    expect(
+      screen.getByText('Actual street route (not generated yet)'),
+    ).toBeVisible();
+    expect(
+      engine.sources.get('drawtrail-target-geometry')?.setData,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'FeatureCollection',
+        features: expect.arrayContaining([
+          expect.objectContaining({
+            properties: expect.objectContaining({ strokeId: 'preset-heart' }),
+          }),
+        ]),
+      }),
+    );
   });
 
   it('stores clicks and drags in editor state with explicit GeoJSON order', async () => {

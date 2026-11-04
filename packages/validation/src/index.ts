@@ -8,6 +8,45 @@ export const lngLatSchema = z.tuple([
   z.number().finite().min(-90).max(90),
 ]);
 
+/** Lyon editor bounds catch reversed [latitude, longitude] input as well as world-range errors. */
+export const lyonLngLatSchema = lngLatSchema.superRefine(
+  ([longitude, latitude], context) => {
+    if (
+      longitude < 4.65 ||
+      longitude > 5.02 ||
+      latitude < 45.63 ||
+      latitude > 45.9
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Coordinate must be [longitude, latitude] inside the Lyon editor area.',
+      });
+    }
+  },
+);
+
+export const geoJSONLineFeatureCollectionSchema = z
+  .object({
+    type: z.literal('FeatureCollection'),
+    features: z.array(
+      z
+        .object({
+          type: z.literal('Feature'),
+          id: z.string().optional(),
+          properties: z.record(z.string(), z.unknown()),
+          geometry: z
+            .object({
+              type: z.literal('LineString'),
+              coordinates: z.array(lyonLngLatSchema).min(2),
+            })
+            .strict(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 export const DRAWING_LIMITS = {
   strokes: 24,
   pointsPerStroke: 2048,

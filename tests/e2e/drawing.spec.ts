@@ -167,6 +167,27 @@ test('presets and transforms persist across reloads while map location stays tra
   ).toBe(true);
 });
 
+test('a drawing can be placed near the start and appears as a separate map target', async ({
+  page,
+}) => {
+  await mockMapStyle(page);
+  await page.goto('/workspace');
+  await page.getByLabel('Latitude', { exact: true }).fill('45.764');
+  await page.getByLabel('Longitude', { exact: true }).fill('4.8357');
+  await page.getByRole('button', { name: 'Set start point' }).click();
+  await page.getByRole('button', { name: 'Draw your idea' }).click();
+  await page.getByRole('button', { name: 'Heart', exact: true }).click();
+  await expect(page.getByText('Candidate 1 of 12')).toBeVisible();
+  await page.getByRole('button', { name: 'Try another placement' }).click();
+  await expect(page.getByText('Candidate 2 of 12')).toBeVisible();
+  await page.getByRole('button', { name: 'Preview target on map' }).click();
+  await expect(page.getByLabel('Map geometry legend')).toBeVisible();
+  await expect(page.getByText('Target drawing', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('Actual street route (not generated yet)', { exact: true }),
+  ).toBeVisible();
+});
+
 test('SVG import rejects active content and preserves explicit stroke ordering', async ({
   page,
 }) => {
@@ -195,6 +216,19 @@ test('SVG import rejects active content and preserves explicit stroke ordering',
   await expect(page.getByLabel('Stroke count', { exact: true })).toHaveText(
     '1 stroke',
   );
+  for (const filename of [
+    'heart.svg',
+    'circle.svg',
+    'letter.svg',
+    'open-stroke.svg',
+    'figure-eight.svg',
+  ]) {
+    await upload.setInputFiles(resolve(`tests/fixtures/drawing/${filename}`));
+    await expect(page.getByLabel('Stroke count', { exact: true })).toHaveText(
+      '1 stroke',
+    );
+    await expect(page.locator('.drawing-canvas polyline')).toHaveCount(1);
+  }
   await upload.setInputFiles({
     name: 'large.svg',
     mimeType: 'image/svg+xml',

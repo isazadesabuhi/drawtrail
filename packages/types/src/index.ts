@@ -1,5 +1,25 @@
 /** Public coordinates always use GeoJSON order: [longitude, latitude]. */
 export type LngLat = readonly [longitude: number, latitude: number];
+/** Local East/North metres in a tangent plane centered on an explicit WGS84 anchor. */
+export type EastNorth = readonly [eastMeters: number, northMeters: number];
+export interface GeoJSONLineString {
+  type: 'LineString';
+  coordinates: readonly LngLat[];
+}
+export interface GeoJSONFeature<
+  P extends Record<string, unknown> = Record<string, unknown>,
+> {
+  type: 'Feature';
+  id?: string;
+  properties: P;
+  geometry: GeoJSONLineString;
+}
+export interface GeoJSONFeatureCollection<
+  P extends Record<string, unknown> = Record<string, unknown>,
+> {
+  type: 'FeatureCollection';
+  features: readonly GeoJSONFeature<P>[];
+}
 export type ActivityMode = 'walking' | 'running' | 'cycling';
 
 export interface ActivityOption {
