@@ -22,6 +22,7 @@
     "typecheck": "tsc -p packages/types && tsc -p packages/validation && tsc -p packages/geo-utils && tsc -p packages/api-client && tsc -p apps/web && tsc -p tsconfig.tools.json",
     "test": "vitest run --configLoader runner",
     "test:e2e": "playwright test",
+    "test:e2e:dev": "node tools/test-dev.mjs",
     "check": "npm run check:docs && npm run format:check && npm run lint && npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {

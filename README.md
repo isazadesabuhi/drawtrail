@@ -19,6 +19,8 @@ pnpm dev
 
 Open <http://localhost:3000> or go directly to <http://localhost:3000/workspace>. Stop the server with Ctrl+C.
 
+Development uses Next.js's Webpack mode. This avoids a CSS-worker flood observed with Turbopack development on this Windows setup; the production build continues to use Turbopack. Tailwind/PostCSS are pinned together at 4.3.3, with the web app configured as the explicit CSS base directory.
+
 On Windows, use `pnpm.cmd` if PowerShell blocks `.ps1` launchers. If pnpm is not installed, `npm.cmd install --global pnpm@11.25.0` installs it in an ordinary unrestricted development session. Do not change system execution policy for this app.
 
 After dependencies have been installed with pnpm, npm can also run the project scripts:
@@ -39,11 +41,14 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm exec playwright install chromium
+pnpm test:e2e:dev
 pnpm build:e2e
 pnpm test:e2e
 ```
 
 Each script can also be run with `npm.cmd run <script>`. `npm.cmd test` runs the unit/component suite; `npx.cmd playwright install chromium` installs the browser when network access is available. Run `pnpm build:e2e` before browser tests so they use synthetic fixture geometry instead of live public tiles. Playwright starts and stops its own production server. Rebuild with ordinary `pnpm build` afterward for normal production use; `pnpm start` serves that completed build.
+
+`pnpm test:e2e:dev` runs the same browser journeys against a fresh development server on port 3130, using local map fixtures. Stop any existing development server for this checkout first: Next.js allows only one dev server per application directory. It does not need a production build. Both dev and production browser suites run in CI.
 
 If Chromium download is unavailable, set `PLAYWRIGHT_EXECUTABLE_PATH` to an installed Chrome/Chromium executable for local testing. In Windows PowerShell, for example:
 

@@ -37,11 +37,14 @@ Map clicks, marker drags, manual entry, and local search update one React editor
 
 ```sh
 pnpm test
+pnpm test:e2e:dev
 pnpm build:e2e
 pnpm test:e2e
 ```
 
 `build:e2e` creates a production build configured with a test style URL; Playwright intercepts it and supplies synthetic local GeoJSON. No test claims that those lines are actual streets. Public OSM tile requests are blocked by test routing. Run `pnpm build` again to replace the test-configured build before ordinary production use.
+
+`test:e2e:dev` starts the root development command on port 3130 with the same fixture configuration and runs the browser suite without a production build. Close any other development server for this checkout before running it. Development uses Webpack to avoid the observed Windows Turbopack CSS-worker failure; production remains on Turbopack.
 
 The mocked-renderer suite verifies marker state, cleanup, configuration/search failures, coordinate validation, and retry. Browser tests exercise real WebGL/MapLibre workers, navigation controls, keyboard behavior, dragging, responsive layout, and style failure/recovery against the fixture. Phone viewport emulation does not replace physical device testing. See README for using an installed Chrome when Playwright Chromium is unavailable.
 

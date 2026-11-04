@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start"
   },
@@ -19,7 +19,8 @@
     "zod": "4.3.6"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "4.2.2",
-    "tailwindcss": "4.2.2"
+    "@tailwindcss/postcss": "4.3.3",
+    "postcss": "8.5.28",
+    "tailwindcss": "4.3.3"
   }
 }
