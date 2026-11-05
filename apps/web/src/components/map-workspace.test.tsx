@@ -10,6 +10,7 @@ import {
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LYON_CENTER, LYON_ZOOM } from '@drawtrail/geo-utils';
+import { apiSuccessEnvelope } from '@drawtrail/api-client';
 import type { Geocoder } from '../lib/geocoding';
 import type { MapConfiguration } from '../lib/map-config';
 import { MapWorkspace } from './map-workspace';
@@ -335,7 +336,10 @@ describe('map workspace with a mocked renderer', () => {
       ],
     };
     const fetcher = vi.fn<typeof fetch>(
-      async () => new Response(JSON.stringify(result), { status: 200 }),
+      async () =>
+        new Response(JSON.stringify(apiSuccessEnvelope(result)), {
+          status: 200,
+        }),
     );
     vi.stubGlobal('fetch', fetcher);
     render(<MapWorkspace configuration={configuration} />);
@@ -413,10 +417,14 @@ describe('map workspace with a mocked renderer', () => {
       async () =>
         new Response(
           JSON.stringify({
+            apiVersion: 'v1',
             status: 'error',
-            code: 'missing_region',
-            message: 'No routing graph covers one of these waypoints.',
-            warnings: [],
+            data: null,
+            error: {
+              code: 'missing_region',
+              message: 'No routing graph covers one of these waypoints.',
+              warnings: [],
+            },
           }),
           { status: 404 },
         ),

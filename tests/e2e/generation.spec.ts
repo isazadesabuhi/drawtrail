@@ -12,34 +12,38 @@ test('generates a routed baseline and shows route metrics and warnings', async (
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        apiVersion: 'v1',
         status: 'success',
-        targetGeometry: {
-          type: 'LineString',
-          coordinates: [
-            [4.84, 45.77],
-            [4.8401, 45.7701],
-          ],
-        },
-        route: {
-          type: 'Feature',
-          properties: { mode: 'walking' },
-          geometry: {
+        error: null,
+        data: {
+          targetGeometry: {
             type: 'LineString',
             coordinates: [
               [4.84, 45.77],
-              [4.84005, 45.7702],
               [4.8401, 45.7701],
             ],
           },
+          route: {
+            type: 'Feature',
+            properties: { mode: 'walking' },
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [4.84, 45.77],
+                [4.84005, 45.7702],
+                [4.8401, 45.7701],
+              ],
+            },
+          },
+          distanceMeters: 1800,
+          requestedDistanceMeters: 3000,
+          similarityScore: 0.82,
+          retracingMeters: 0,
+          waypointCount: 8,
+          warnings: [
+            'Routed distance differs from the requested distance by more than 20%.',
+          ],
         },
-        distanceMeters: 1800,
-        requestedDistanceMeters: 3000,
-        similarityScore: 0.82,
-        retracingMeters: 0,
-        waypointCount: 8,
-        warnings: [
-          'Routed distance differs from the requested distance by more than 20%.',
-        ],
       }),
     });
   });
@@ -109,10 +113,14 @@ test('shows a typed missing-region failure without displaying a false route', as
       status: 404,
       contentType: 'application/json',
       body: JSON.stringify({
+        apiVersion: 'v1',
         status: 'error',
-        code: 'missing_region',
-        message: 'No routing graph covers one of these waypoints.',
-        warnings: [],
+        data: null,
+        error: {
+          code: 'missing_region',
+          message: 'No routing graph covers one of these waypoints.',
+          warnings: [],
+        },
       }),
     }),
   );

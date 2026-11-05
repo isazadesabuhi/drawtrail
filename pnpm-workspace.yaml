@@ -7,5 +7,6 @@ preferWorkspacePackages: true
 
 allowBuilds:
   esbuild: true
+  msgpackr-extract: false
   sharp: false
   unrs-resolver: false

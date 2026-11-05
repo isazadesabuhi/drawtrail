@@ -1,10 +1,13 @@
 import { generateRoute } from '../../../../lib/route-generator';
 import { ValhallaClient } from '../../../../lib/valhalla-client';
 import { readServerConfig } from '../../../../lib/env.mjs';
+import { apiErrorEnvelope, apiSuccessEnvelope } from '@drawtrail/api-client';
 import {
+  apiEnvelopeSchema,
   routeGenerationFailureSchema,
   routeGenerationRequestSchema,
   routeGenerationResponseSchema,
+  routeGenerationSuccessSchema,
 } from '@drawtrail/validation';
 
 export const runtime = 'nodejs';
@@ -31,7 +34,12 @@ export async function POST(request: Request) {
       message: 'Request body must be valid JSON.',
       warnings: [],
     });
-    return Response.json(body, { status: 400 });
+    return Response.json(
+      apiEnvelopeSchema(routeGenerationSuccessSchema).parse(
+        apiErrorEnvelope(body.code, body.message, body.warnings),
+      ),
+      { status: 400 },
+    );
   }
 
   const parsed = routeGenerationRequestSchema.safeParse(payload);
@@ -43,7 +51,12 @@ export async function POST(request: Request) {
         'The route request is invalid. Check the drawing, coordinates, mode, and settings.',
       warnings: [],
     });
-    return Response.json(body, { status: 400 });
+    return Response.json(
+      apiEnvelopeSchema(routeGenerationSuccessSchema).parse(
+        apiErrorEnvelope(body.code, body.message, body.warnings),
+      ),
+      { status: 400 },
+    );
   }
 
   let config: ReturnType<typeof readServerConfig>;
@@ -56,7 +69,12 @@ export async function POST(request: Request) {
       message: 'Routing configuration is invalid. Check VALHALLA_URL.',
       warnings: [],
     });
-    return Response.json(body, { status: 503 });
+    return Response.json(
+      apiEnvelopeSchema(routeGenerationSuccessSchema).parse(
+        apiErrorEnvelope(body.code, body.message, body.warnings),
+      ),
+      { status: 503 },
+    );
   }
 
   const client = new ValhallaClient({
@@ -86,9 +104,21 @@ export async function POST(request: Request) {
         )
           .then((response) => {
             const validated = routeGenerationResponseSchema.parse(response);
+            const envelope =
+              validated.status === 'success'
+                ? apiEnvelopeSchema(routeGenerationSuccessSchema).parse(
+                    apiSuccessEnvelope(validated),
+                  )
+                : apiEnvelopeSchema(routeGenerationSuccessSchema).parse(
+                    apiErrorEnvelope(
+                      validated.code,
+                      validated.message,
+                      validated.warnings,
+                    ),
+                  );
             controller.enqueue(
               encoder.encode(
-                `event: result\ndata: ${JSON.stringify(validated)}\n\n`,
+                `event: result\ndata: ${JSON.stringify(envelope)}\n\n`,
               ),
             );
             controller.close();
@@ -122,7 +152,19 @@ export async function POST(request: Request) {
     request.signal,
   );
   const validated = routeGenerationResponseSchema.parse(response);
-  return Response.json(validated, {
+  const envelope =
+    validated.status === 'success'
+      ? apiEnvelopeSchema(routeGenerationSuccessSchema).parse(
+          apiSuccessEnvelope(validated),
+        )
+      : apiEnvelopeSchema(routeGenerationSuccessSchema).parse(
+          apiErrorEnvelope(
+            validated.code,
+            validated.message,
+            validated.warnings,
+          ),
+        );
+  return Response.json(envelope, {
     status: validated.status === 'success' ? 200 : statusFor(validated.code),
   });
 }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   activityModeSchema,
+  apiEnvelopeSchema,
+  generationJobAcceptedSchema,
+  generationJobStatusSchema,
   geoJSONLineFeatureCollectionSchema,
   lngLatSchema,
   lyonLngLatSchema,
@@ -75,5 +78,60 @@ describe('WGS84 coordinates', () => {
         ],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('versioned API and generation job contracts', () => {
+  const envelope = apiEnvelopeSchema(activityModeSchema);
+  it('accepts versioned success and error envelopes only', () => {
+    expect(
+      envelope.safeParse({
+        apiVersion: 'v1',
+        status: 'success',
+        data: 'walking',
+        error: null,
+      }).success,
+    ).toBe(true);
+    expect(
+      envelope.safeParse({
+        apiVersion: 'v1',
+        status: 'error',
+        data: null,
+        error: { code: 'not_found', message: 'Missing.', warnings: [] },
+      }).success,
+    ).toBe(true);
+    expect(
+      envelope.safeParse({
+        apiVersion: 'v2',
+        status: 'success',
+        data: 'walking',
+        error: null,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('validates accepted job and all persisted state fields', () => {
+    const id = 'f9b1d832-7a22-4ac0-987b-c99c017fc472';
+    expect(
+      generationJobAcceptedSchema.parse({
+        id,
+        state: 'pending',
+        statusUrl: `/api/v1/generations/${id}`,
+        reused: false,
+      }).id,
+    ).toBe(id);
+    expect(
+      generationJobStatusSchema.safeParse({
+        id,
+        state: 'running',
+        progress: { stage: 'searching', completed: 2, total: 8 },
+        result: null,
+        error: null,
+        createdAt: '2026-11-05T10:00:00.000Z',
+        updatedAt: '2026-11-05T10:00:02.000Z',
+        startedAt: '2026-11-05T10:00:01.000Z',
+        completedAt: null,
+      }).success,
+    ).toBe(true);
   });
 });

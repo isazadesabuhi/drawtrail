@@ -62,24 +62,29 @@ assert.equal(
   'success',
   `Unexpected response: ${JSON.stringify(body)}`,
 );
-assert.equal(body.route?.properties?.mode, 'walking');
+const generation = body.data;
+assert.equal(generation.route?.properties?.mode, 'walking');
 assert(
-  body.route.geometry.coordinates.length >= 2,
+  generation.route.geometry.coordinates.length >= 2,
   'Generated route needs line geometry.',
 );
-assert(Number.isFinite(body.distanceMeters) && body.distanceMeters > 0);
 assert(
-  Number.isFinite(body.similarityScore) &&
-    body.similarityScore >= 0 &&
-    body.similarityScore <= 1,
+  Number.isFinite(generation.distanceMeters) && generation.distanceMeters > 0,
 );
 assert(
-  body.waypointCount >= 2 &&
-    body.waypointCount <= requestBody.settings.maxWaypoints,
+  Number.isFinite(generation.similarityScore) &&
+    generation.similarityScore >= 0 &&
+    generation.similarityScore <= 1,
+);
+assert(
+  generation.waypointCount >= 2 &&
+    generation.waypointCount <= requestBody.settings.maxWaypoints,
 );
 
-const [startLongitude, startLatitude] = body.route.geometry.coordinates[0];
-const [endLongitude, endLatitude] = body.route.geometry.coordinates.at(-1);
+const [startLongitude, startLatitude] =
+  generation.route.geometry.coordinates[0];
+const [endLongitude, endLatitude] =
+  generation.route.geometry.coordinates.at(-1);
 const earthRadiusMeters = 6_371_008.8;
 const radians = (degrees) => (degrees * Math.PI) / 180;
 const latitudeDelta = radians(endLatitude - startLatitude);
@@ -97,8 +102,8 @@ assert(
 );
 
 console.log(
-  `PASS ${selectedRegion.name} heart baseline: ${(body.distanceMeters / 1000).toFixed(2)} km, ${Math.round(body.similarityScore * 100)}% similarity, ${body.waypointCount} ordered waypoints, ${closureMeters.toFixed(1)} m loop gap.`,
+  `PASS ${selectedRegion.name} heart baseline: ${(generation.distanceMeters / 1000).toFixed(2)} km, ${Math.round(generation.similarityScore * 100)}% similarity, ${generation.waypointCount} ordered waypoints, ${closureMeters.toFixed(1)} m loop gap.`,
 );
-if (body.warnings.length) {
-  console.log(`Route warnings: ${body.warnings.join(' ')}`);
+if (generation.warnings.length) {
+  console.log(`Route warnings: ${generation.warnings.join(' ')}`);
 }

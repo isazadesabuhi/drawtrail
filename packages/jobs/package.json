@@ -1,0 +1,15 @@
+{
+  "name": "@drawtrail/jobs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "bullmq": "^6.6.0",
+    "ioredis": "^6.0.0",
+    "pg": "^8.23.1",
+    "@drawtrail/validation": "*"
+  }
+}

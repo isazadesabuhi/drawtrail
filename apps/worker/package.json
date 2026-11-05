@@ -1,0 +1,15 @@
+{
+  "name": "@drawtrail/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=../../.env --import tsx src/index.ts"
+  },
+  "dependencies": {
+    "@drawtrail/jobs": "*",
+    "@drawtrail/validation": "*",
+    "bullmq": "^6.6.0",
+    "ioredis": "^6.0.0"
+  }
+}

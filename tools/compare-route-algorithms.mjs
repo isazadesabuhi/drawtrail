@@ -115,6 +115,7 @@ for (const [neighborhoodIndex, center] of region.centers.entries()) {
         signal: AbortSignal.timeout(90_000),
       });
       const result = await response.json().catch(() => null);
+      const generation = result?.status === 'success' ? result.data : null;
       const elapsedMs = Math.round(performance.now() - started);
       cases.push({
         neighborhood: `${region.name}-${neighborhoodIndex + 1}`,
@@ -122,11 +123,11 @@ for (const [neighborhoodIndex, center] of region.centers.entries()) {
         mode,
         elapsedMs,
         status: result?.status ?? 'invalid_response',
-        distanceMeters: result?.distanceMeters ?? null,
-        similarityScore: result?.similarityScore ?? null,
-        retracingMeters: result?.retracingMeters ?? null,
-        routerPlacements: result?.alternatives?.length ?? 0,
-        errorCode: result?.code ?? null,
+        distanceMeters: generation?.distanceMeters ?? null,
+        similarityScore: generation?.similarityScore ?? null,
+        retracingMeters: generation?.retracingMeters ?? null,
+        routerPlacements: generation?.alternatives?.length ?? 0,
+        errorCode: result?.error?.code ?? null,
       });
       console.log(
         `${cases.at(-1).status.toUpperCase()} ${cases.at(-1).neighborhood} ${shape}/${mode}: ${elapsedMs} ms`,

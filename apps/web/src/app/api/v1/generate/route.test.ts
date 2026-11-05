@@ -3,6 +3,7 @@ import {
   routeGenerationRequestSchema,
   routeGenerationResponseSchema,
 } from '@drawtrail/validation';
+import { apiSuccessEnvelope } from '@drawtrail/api-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../lib/route-generator', () => ({
@@ -61,6 +62,8 @@ describe('POST /api/v1/generate progress streaming', () => {
     expect(stream).toContain(
       'event: progress\ndata: {"stage":"searching","completed":2,"total":2}',
     );
-    expect(stream).toContain(`event: result\ndata: ${JSON.stringify(result)}`);
+    expect(stream).toContain(
+      `event: result\ndata: ${JSON.stringify(apiSuccessEnvelope(result))}`,
+    );
   });
 });

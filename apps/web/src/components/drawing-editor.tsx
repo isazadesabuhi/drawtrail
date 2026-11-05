@@ -32,9 +32,10 @@ import {
   type PresetName,
 } from '@drawtrail/geo-utils';
 import {
+  apiEnvelopeSchema,
   activityModeSchema,
   drawingSchema,
-  routeGenerationResponseSchema,
+  routeGenerationSuccessSchema,
   type RouteGenerationSuccess,
 } from '@drawtrail/validation';
 import { readDrawingDraft, writeDrawingDraft } from '../lib/drawing-draft';
@@ -301,7 +302,7 @@ function DrawingSession({
           },
         }),
       });
-      const result = routeGenerationResponseSchema.safeParse(
+      const result = apiEnvelopeSchema(routeGenerationSuccessSchema).safeParse(
         await readGenerationResponse(response, (completed, total) => {
           setFeedback({
             error: false,
@@ -313,9 +314,9 @@ function DrawingSession({
         throw new Error('The route service returned an unreadable response.');
       }
       if (result.data.status === 'error') {
-        throw new Error(result.data.message);
+        throw new Error(result.data.error.message);
       }
-      onGenerated(result.data);
+      onGenerated(result.data.data);
       setFeedback({
         error: false,
         text: 'Street route generated. Review its distance, similarity, and warnings on the map.',

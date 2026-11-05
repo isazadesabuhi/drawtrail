@@ -267,6 +267,94 @@ export const routeGenerationResponseSchema = z.discriminatedUnion('status', [
   routeGenerationFailureSchema,
 ]);
 
+export const apiErrorCodeSchema = z.enum([
+  'invalid_request',
+  'invalid_drawing',
+  'unsupported_multistroke',
+  'infeasible_waypoint',
+  'no_route',
+  'missing_region',
+  'engine_down',
+  'timeout',
+  'cancelled',
+  'route_discontinuity',
+  'invalid_response',
+  'optimization_budget',
+  'not_found',
+  'service_unavailable',
+  'idempotency_conflict',
+  'internal_error',
+]);
+
+export function apiEnvelopeSchema<T extends z.ZodType>(dataSchema: T) {
+  return z.discriminatedUnion('status', [
+    z
+      .object({
+        apiVersion: z.literal('v1'),
+        status: z.literal('success'),
+        data: dataSchema,
+        error: z.null(),
+      })
+      .strict(),
+    z
+      .object({
+        apiVersion: z.literal('v1'),
+        status: z.literal('error'),
+        data: z.null(),
+        error: z
+          .object({
+            code: apiErrorCodeSchema,
+            message: z.string().min(1),
+            warnings: z.array(z.string().min(1)).default([]),
+          })
+          .strict(),
+      })
+      .strict(),
+  ]);
+}
+
+export const generationJobStateSchema = z.enum([
+  'pending',
+  'running',
+  'completed',
+  'failed',
+  'cancelled',
+]);
+export const generationProgressSchema = z
+  .object({
+    stage: z.string().min(1),
+    completed: z.number().int().min(0),
+    total: z.number().int().min(1),
+  })
+  .strict();
+export const generationJobAcceptedSchema = z
+  .object({
+    id: z.string().uuid(),
+    state: generationJobStateSchema,
+    statusUrl: z.string().startsWith('/api/v1/generations/'),
+    reused: z.boolean(),
+  })
+  .strict();
+export const generationJobStatusSchema = z
+  .object({
+    id: z.string().uuid(),
+    state: generationJobStateSchema,
+    progress: generationProgressSchema.nullable(),
+    result: routeGenerationSuccessSchema.nullable(),
+    error: z
+      .object({
+        code: apiErrorCodeSchema,
+        message: z.string().min(1),
+      })
+      .strict()
+      .nullable(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    startedAt: z.string().datetime().nullable(),
+    completedAt: z.string().datetime().nullable(),
+  })
+  .strict();
+
 export type RouteGenerationRequest = z.infer<
   typeof routeGenerationRequestSchema
 >;
@@ -282,3 +370,7 @@ export type RouteGenerationFailure = z.infer<
 export type RouteGenerationResponse = z.infer<
   typeof routeGenerationResponseSchema
 >;
+export type GenerationJobAccepted = z.infer<typeof generationJobAcceptedSchema>;
+export type GenerationJobStatus = z.infer<typeof generationJobStatusSchema>;
+export type GenerationJobState = z.infer<typeof generationJobStateSchema>;
+export type GenerationProgress = z.infer<typeof generationProgressSchema>;

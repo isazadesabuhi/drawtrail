@@ -2,13 +2,13 @@
 
 A local-first GPS art app: turn a simple drawing into a connected walking, running, or cycling route on real streets.
 
-This checkout includes **Phase 07 area-based route search** alongside the GPS-art workspace. At `/workspace`, choose an area center anywhere on the map, draw or import a shape, then optionally search an adjustable radius around that point. The optimizer tries eight bounded positions, rotations, and scales, and returns the strongest route it finds. Review the real street geometry, measured distance, shape similarity, and warnings on the map. Search is limited by the region loaded into Valhalla; the local Rhône-Alpes graph covers the Lyon workspace. Drawings and homepage artwork are target art, not navigable routes.
+This checkout includes **Phase 08 durable route-generation jobs** alongside the GPS-art workspace. At `/workspace`, choose an area center anywhere on the map, draw or import a shape, then optionally search an adjustable radius around that point. Review real street geometry, measured distance, shape similarity, alternatives, and warnings. Search is limited by the region loaded into Valhalla; the local Rhône-Alpes graph covers the Lyon workspace. Drawings and homepage artwork are target art, not navigable routes.
 
 ## Requirements
 
 - Node.js 24 LTS recommended (minimum configured: 22.13).
 - pnpm 11.25.0, recorded in `package.json`.
-- Docker Desktop with WSL2 on Windows is optional for the web workspace and required to run local routing. No credentials, database, or paid service is needed.
+- Docker Desktop with WSL2 on Windows is optional for the basic web workspace and required for local routing plus durable generation jobs. The job services use local development credentials; no paid service is needed.
 
 ## Start locally
 
@@ -62,7 +62,7 @@ CI installs Playwright's matching Chromium automatically. Local browser checks u
 
 ## Environment and service boundaries
 
-No variables are required for Gate A. `apps/web/.env.example` documents the optional future `VALHALLA_URL`; copy it to `apps/web/.env.local` when needed. The startup validator rejects invalid HTTP(S) URLs without printing their contents. Routing code must call the validator with `requireRouter = true` so missing configuration fails explicitly. Never prefix routing credentials with `NEXT_PUBLIC_` or import server configuration into browser components.
+Copy `.env.example` to the repository root for Docker Compose and the worker, and copy `apps/web/.env.example` to `apps/web/.env.local` for Next.js. These files contain local service URLs and development-only database credentials. The startup validator rejects invalid HTTP(S) Valhalla URLs without printing their contents. Never prefix server service configuration with `NEXT_PUBLIC_` or import it into browser components.
 
 Interactive development uses attributed OSM standard tiles by default. Production requires `NEXT_PUBLIC_MAP_STYLE_URL` and `NEXT_PUBLIC_MAP_ATTRIBUTION`; without them, coordinate selection still works and the map shows a configuration message. See [map development](docs/development/maps.md) for provider setup, service usage limits, search abstraction, coordinate conventions, and fixture-based tests. The start point stays in editor state while switching stages; map locations reset on reload.
 
@@ -70,7 +70,9 @@ Drawing drafts now survive reloads on the same browser/device. The map location 
 
 Geographic placement uses a local East/North metric projection and deterministic candidate generation. See [geographic placement](docs/algorithm/geographic-placement.md) for projection limits, footprint semantics, validation warnings and overlay colors.
 
-To run routing locally, start Docker Desktop, then run `pnpm routing:up` and `pnpm routing:health`. The initial Valhalla graph uses Andorra as a small test region and is stored in a persistent Docker volume. Routing setup, larger Lyon/Rhône extracts, disk/RAM guidance, OSM licensing, and opt-in integration tests are documented in [local routing](docs/development/routing.md). Stop the service with `pnpm routing:down`; the graph volume remains available for the next start.
+To run durable generation jobs, start Docker Desktop and run `pnpm jobs:up` and `pnpm db:migrate`, then start `pnpm worker` alongside `pnpm dev`. Redis/BullMQ processes jobs, while PostgreSQL/PostGIS stores job state and route candidates. Setup and API details are in [durable jobs](docs/development/jobs.md). The local services use development-only credentials.
+
+To run routing locally, run `pnpm routing:up` and `pnpm routing:health`. Routing setup, larger Lyon/Rhône extracts, disk/RAM guidance, OSM licensing, and opt-in integration tests are documented in [local routing](docs/development/routing.md). Stop the service with `pnpm routing:down`; the graph volume remains available for the next start.
 
 To exercise drawing-to-route area search, start `pnpm dev` in another terminal and run `pnpm test:generation:integration`. The smoke test detects the loaded Lyon or Andorra graph and searches three candidates. See [generation development](docs/development/generation.md) for details and fixed-fixture tests.
 
@@ -81,7 +83,9 @@ apps/web/                 Next.js App Router + Tailwind
 packages/types/           Browser-safe public contracts
 packages/validation/      Zod schemas
 packages/geo-utils/       Lyon center, editor bounds, and boundary helpers
-packages/api-client/      Versioned client foundation
+packages/api-client/      Versioned API response envelopes
+packages/jobs/            PostgreSQL persistence and BullMQ queue
+apps/worker/              Standalone route-generation worker
 apps/web/src/lib/         Server-only Valhalla route client and typed errors
 docs/product/             Scope and user journeys
 docs/algorithm/           Metrics and quality gates
@@ -90,7 +94,7 @@ tests/e2e/                Desktop/mobile Playwright smoke tests
 tasks.md                  Original backlog + living task registry
 ```
 
-The future worker and Expo app are intentionally deferred to their backlog phases. No routing API endpoint is advertised by this scaffold.
+The durable job API is available at `/api/v1/generations`; Expo remains deferred to its backlog phase.
 
 ## Troubleshooting
 

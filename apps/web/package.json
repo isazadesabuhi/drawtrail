@@ -10,6 +10,7 @@
   "dependencies": {
     "@drawtrail/api-client": "*",
     "@drawtrail/geo-utils": "*",
+    "@drawtrail/jobs": "*",
     "@drawtrail/types": "*",
     "@drawtrail/validation": "*",
     "maplibre-gl": "6.16.0",
