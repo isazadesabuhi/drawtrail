@@ -64,6 +64,57 @@ export async function POST(request: Request) {
     timeoutMs: 12_000,
     retries: 1,
   });
+  const streamProgress = request.headers
+    .get('accept')
+    ?.includes('text/event-stream');
+  if (streamProgress) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        void generateRoute(
+          parsed.data,
+          (mode, from, to, signal) =>
+            client.route(mode, from, to, signal ? { signal } : {}),
+          request.signal,
+          (progress) => {
+            controller.enqueue(
+              encoder.encode(
+                `event: progress\ndata: ${JSON.stringify(progress)}\n\n`,
+              ),
+            );
+          },
+        )
+          .then((response) => {
+            const validated = routeGenerationResponseSchema.parse(response);
+            controller.enqueue(
+              encoder.encode(
+                `event: result\ndata: ${JSON.stringify(validated)}\n\n`,
+              ),
+            );
+            controller.close();
+          })
+          .catch((error: unknown) => {
+            controller.enqueue(
+              encoder.encode(
+                `event: error\ndata: ${JSON.stringify({ message: error instanceof Error ? error.message : 'Route generation failed.' })}\n\n`,
+              ),
+            );
+            controller.close();
+          });
+      },
+      cancel() {
+        // The incoming request signal is passed through to the routing engine.
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        'content-type': 'text/event-stream; charset=utf-8',
+        'cache-control': 'no-cache, no-transform',
+        connection: 'keep-alive',
+      },
+    });
+  }
+
   const response = await generateRoute(
     parsed.data,
     (mode, from, to, signal) =>

@@ -449,61 +449,61 @@
 
 **Acceptance:** No candidate exits search area.
 
-### [ ] 07-04 — Add shape-fidelity metric refinement
+### [x] 07-04 — Add shape-fidelity metric refinement
 
 **Scope:** Compare normalized geometry with symmetric distance and preserve salient corners.
 
 **Acceptance:** Known fixtures rank in sensible order.
 
-### [ ] 07-05 — Add distance deviation penalty
+### [x] 07-05 — Add distance deviation penalty
 
 **Scope:** Favor requested kilometers with hard maximum deviation option.
 
 **Acceptance:** Scoring tests reject overlong alternative when configured.
 
-### [ ] 07-06 — Add retracing penalty
+### [x] 07-06 — Add retracing penalty
 
 **Scope:** Detect repeated road segments and score unavoidable vs excessive backtracking.
 
 **Acceptance:** Simple out-and-back ranks below reasonable loop.
 
-### [ ] 07-07 — Add continuity and accessibility validation
+### [x] 07-07 — Add continuity and accessibility validation
 
 **Scope:** Ensure adjacent segments connect and engine-approved mode is followed.
 
 **Acceptance:** Disconnected/invalid routes never show as navigable.
 
-### [ ] 07-08 — Introduce alternative candidate ranking
+### [x] 07-08 — Introduce alternative candidate ranking
 
 **Scope:** Return best three distinct routes, deduplicated by geometry overlap.
 
 **Acceptance:** UI does not show three identical routes.
 
-### [ ] 07-09 — Make optimizer deterministic
+### [x] 07-09 — Make optimizer deterministic
 
 **Scope:** Accept seed, bounds, config and iteration cap.
 
 **Acceptance:** Same fixtures produce same ordering.
 
-### [ ] 07-10 — Add runtime budgets and cancellation
+### [x] 07-10 — Add runtime budgets and cancellation
 
 **Scope:** Enforce max requests/seconds and abort work safely.
 
 **Acceptance:** Cancellation stops new API calls.
 
-### [ ] 07-11 — Add progress reporting
+### [x] 07-11 — Add progress reporting
 
 **Scope:** Report stages with counts and approximate progress without false precision.
 
 **Acceptance:** UI shows processing and completion states.
 
-### [ ] 07-12 — Add algorithm comparison harness
+### [x] 07-12 — Add algorithm comparison harness
 
 **Scope:** Benchmark heart, letter, circle in two neighborhoods across modes.
 
 **Acceptance:** Report quality and runtime to JSON.
 
-### [ ] 07-13 — Handle impossible art gracefully
+### [x] 07-13 — Handle impossible art gracefully
 
 **Scope:** Give best-effort result with clear low-fidelity warning or no-route state.
 
@@ -1013,16 +1013,16 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 | 07-01 | done   | See phase dependencies above | Deterministic area search compares bounded rotations and selects the highest-scoring viable result; covered by generator tests and live Lyon generation. |
 | 07-02 | done   | See phase dependencies above | Scale candidates vary physical target size around the requested distance; scale behavior is covered by a metric-length test.                             |
 | 07-03 | done   | See phase dependencies above | User-selected map center and radius bound candidate centers; search circle is shown on the map and live-tested against Lyon Valhalla.                    |
-| 07-04 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 07-05 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 07-06 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 07-07 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 07-08 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-04 | done   | See phase dependencies above | Corner-aware symmetric geometry score preserves salient turns; shortcut-misses-corner fixtures rank worse than shape-preserving routes.                  |
+| 07-05 | done   | See phase dependencies above | Relative-distance penalty and optional hard deviation limit are covered by generator tests.                                                              |
+| 07-06 | done   | See phase dependencies above | Metric-grid repeat estimate penalizes out-and-back geometry; tests compare it with a simple loop.                                                        |
+| 07-07 | done   | See phase dependencies above | Segment joins, router provenance, requested mode, and loop closure are validated before success.                                                         |
+| 07-08 | done   | See phase dependencies above | Up to three high-ranked distinct alternatives are returned and selectable in the workspace.                                                              |
 | 07-09 | done   | See phase dependencies above | Seed, radius bounds, and candidate count produce repeatable search results.                                                                              |
-| 07-10 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 07-11 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 07-12 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
-| 07-13 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
+| 07-10 | done   | See phase dependencies above | Router-call/runtime limits preserve best-so-far results; cancellation test proves no additional calls start.                                             |
+| 07-11 | done   | See phase dependencies above | SSE reports discrete completed-placement counts; editor displays counts and keeps JSON fallback support.                                                 |
+| 07-12 | done   | See phase dependencies above | Harness benchmarks heart, letter, and circle across three modes and two detected neighborhoods, with JSON quality/runtime metrics.                       |
+| 07-13 | done   | See phase dependencies above | All-impossible placements return typed no-route with a clear attempts count and never a success geometry.                                                |
 | 08-01 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
 | 08-02 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
 | 08-03 | todo   | See phase dependencies above | Not started.                                                                                                                                             |
@@ -1106,3 +1106,4 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 - 2026-11-04: Phase 04 geographic placement foundations implemented. Metric projection, proportion-preserving footprints, seeded placements, geometry validation, separate MapLibre target/actual-route layers, and canonical fixtures verified. Route layer is intentionally empty pending routing. See docs/progress/phase-04.md and docs/algorithm/geographic-placement.md.
 
 - 2026-11-05: Added Phase 07 bounded area-search slice: global WGS84 map selection, visible adjustable search radius, deterministic center/rotation/scale candidates, route scoring, and Rhône-Alpes local graph setup. Tasks 07-01, 07-02, 07-03, and 07-09 are complete. See docs/progress/phase-07.md for test and live-route evidence; remaining Phase 07 work stays open.
+- 2026-11-05: Completed Phase 07 route-quality scoring, distance limits, repeat-traversal heuristic, route validation, alternatives, runtime/request budgets, cancellation, streaming placement progress, comparison harness, and typed no-route handling. See docs/progress/phase-07.md for scope and limitations.

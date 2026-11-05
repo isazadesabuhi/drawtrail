@@ -35,6 +35,7 @@ test('generates a routed baseline and shows route metrics and warnings', async (
         distanceMeters: 1800,
         requestedDistanceMeters: 3000,
         similarityScore: 0.82,
+        retracingMeters: 0,
         waypointCount: 8,
         warnings: [
           'Routed distance differs from the requested distance by more than 20%.',

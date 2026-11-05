@@ -2,6 +2,7 @@ import type { GeoJSONLineString, LngLat } from '@drawtrail/types';
 import {
   drawingToGeoJSON,
   lineLengthMeters,
+  measureRetracing,
   projectLngLat,
   sampleOrderedWaypoints,
   scoreLineSimilarity,
@@ -10,6 +11,7 @@ import {
 } from '@drawtrail/geo-utils';
 import type {
   RouteGenerationFailure,
+  RouteGenerationAlternative,
   RouteGenerationRequest,
   RouteGenerationResponse,
   RouteGenerationSuccess,
@@ -75,6 +77,13 @@ function mapRouterError(error: unknown, waypointIndex: number) {
     invalid_response: 'invalid_response',
   };
   return failure(messages[error.code], error.message, waypointIndex);
+}
+
+class SearchBudgetError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SearchBudgetError';
+  }
 }
 
 /** Route one ordered stroke segment-by-segment, never inventing a connector. */
@@ -179,7 +188,17 @@ async function generateSingleRoute(
     try {
       segment = await routeSegment(request.mode, from, to, signal);
     } catch (error) {
+      if (error instanceof SearchBudgetError) {
+        return failure('optimization_budget', error.message, waypointIndex);
+      }
       return mapRouterError(error, waypointIndex);
+    }
+    if (segment.mode !== request.mode) {
+      return failure(
+        'invalid_response',
+        `The router returned ${segment.mode} access for a ${request.mode} request.`,
+        waypointIndex,
+      );
     }
     const coordinates = segment.geometry.coordinates;
     if (
@@ -229,6 +248,7 @@ async function generateSingleRoute(
   }
 
   const similarity = scoreLineSimilarity(target, routeLine, request.center);
+  const retracing = measureRetracing(routeLine, request.center);
   const requestedDistanceMeters = request.targetDistanceKm * 1000;
   const warnings: string[] = [];
   if (
@@ -241,6 +261,11 @@ async function generateSingleRoute(
   }
   if (similarity.normalizedError > 0.1) {
     warnings.push('The street route differs noticeably from the drawn shape.');
+  }
+  if (retracing.percent > 0.25) {
+    warnings.push(
+      `The route repeats approximately ${Math.round(retracing.percent * 100)}% of its street distance.`,
+    );
   }
 
   const response: RouteGenerationSuccess = {
@@ -266,6 +291,7 @@ async function generateSingleRoute(
     distanceMeters: distance,
     requestedDistanceMeters,
     similarityScore: similarity.score,
+    retracingMeters: retracing.repeatedMeters,
     waypointCount: waypoints.length,
     warnings,
   };
@@ -321,6 +347,11 @@ export async function generateRoute(
   request: RouteGenerationRequest,
   routeSegment: RouteSegmenter,
   signal?: AbortSignal,
+  onProgress?: (progress: {
+    stage: 'searching';
+    completed: number;
+    total: number;
+  }) => void,
 ): Promise<RouteGenerationResponse> {
   const searchArea = request.settings.searchArea;
   if (!searchArea) return generateSingleRoute(request, routeSegment, signal);
@@ -341,12 +372,43 @@ export async function generateRoute(
         : 'Could not create candidates in the selected search area.',
     );
   }
-  let best: RouteGenerationSuccess | undefined;
-  let bestScore = Number.NEGATIVE_INFINITY;
+  const startedAt = Date.now();
+  const maxRuntimeMs = searchArea.maxRuntimeMs ?? 30_000;
+  const maxRouterRequests =
+    searchArea.maxRouterRequests ??
+    searchArea.candidateCount * (request.settings.maxWaypoints + 1);
+  let routerRequests = 0;
+  let budgetMessage: string | undefined;
+  const boundedRouter: RouteSegmenter = async (mode, from, to, signal) => {
+    if (signal?.aborted) {
+      throw new ValhallaError('cancelled', 'Route search was cancelled.');
+    }
+    if (routerRequests >= maxRouterRequests) {
+      throw new SearchBudgetError(
+        `Search stopped at its ${maxRouterRequests}-request routing limit.`,
+      );
+    }
+    if (Date.now() - startedAt >= maxRuntimeMs) {
+      throw new SearchBudgetError(
+        `Search stopped at its ${Math.round(maxRuntimeMs / 1000)}-second time limit.`,
+      );
+    }
+    routerRequests += 1;
+    return routeSegment(mode, from, to, signal);
+  };
+  const ranked: Array<{ result: RouteGenerationSuccess; score: number }> = [];
   let lastFailure: RouteGenerationFailure | undefined;
-  for (const placement of placements) {
+  for (const [placementIndex, placement] of placements.entries()) {
     if (signal?.aborted) {
       return failure('cancelled', 'Area search was cancelled.');
+    }
+    if (Date.now() - startedAt >= maxRuntimeMs) {
+      budgetMessage = `Search stopped at its ${Math.round(maxRuntimeMs / 1000)}-second time limit.`;
+      break;
+    }
+    if (routerRequests >= maxRouterRequests) {
+      budgetMessage = `Search stopped at its ${maxRouterRequests}-request routing limit.`;
+      break;
     }
     const candidateRequest: RouteGenerationRequest = {
       ...request,
@@ -364,11 +426,20 @@ export async function generateRoute(
     };
     const candidate = await generateSingleRoute(
       candidateRequest,
-      routeSegment,
+      boundedRouter,
       signal,
     );
+    onProgress?.({
+      stage: 'searching',
+      completed: placementIndex + 1,
+      total: placements.length,
+    });
     if (candidate.status === 'error') {
       lastFailure = candidate;
+      if (candidate.code === 'optimization_budget') {
+        budgetMessage = candidate.message;
+        break;
+      }
       if (
         candidate.code === 'engine_down' ||
         candidate.code === 'timeout' ||
@@ -381,24 +452,79 @@ export async function generateRoute(
     const relativeDistanceError =
       Math.abs(candidate.distanceMeters - candidate.requestedDistanceMeters) /
       candidate.requestedDistanceMeters;
-    const score = candidate.similarityScore - 0.25 * relativeDistanceError;
-    if (score > bestScore) {
-      best = candidate;
-      bestScore = score;
+    if (
+      searchArea.maxDistanceDeviationRatio !== undefined &&
+      relativeDistanceError > searchArea.maxDistanceDeviationRatio
+    ) {
+      lastFailure = failure(
+        'no_route',
+        `A candidate exceeded the configured ${(searchArea.maxDistanceDeviationRatio * 100).toFixed(0)}% distance-deviation limit.`,
+      );
+      continue;
     }
+    const retracingRatio =
+      candidate.distanceMeters > 0
+        ? candidate.retracingMeters / candidate.distanceMeters
+        : 0;
+    const score =
+      candidate.similarityScore -
+      0.25 * relativeDistanceError -
+      0.15 * retracingRatio;
+    ranked.push({ result: candidate, score });
   }
+
+  ranked.sort(
+    (first, second) =>
+      second.score - first.score ||
+      first.result.distanceMeters - second.result.distanceMeters,
+  );
+  const alternatives: RouteGenerationAlternative[] = [];
+  for (const item of ranked) {
+    const isDuplicate = alternatives.some((alternative) => {
+      const forward = scoreLineSimilarity(
+        alternative.route.geometry,
+        item.result.route.geometry,
+        request.center,
+      ).score;
+      const backward = scoreLineSimilarity(
+        item.result.route.geometry,
+        alternative.route.geometry,
+        request.center,
+      ).score;
+      return Math.min(forward, backward) >= 0.92;
+    });
+    if (isDuplicate) continue;
+    alternatives.push({
+      id: `route-${alternatives.length + 1}`,
+      targetGeometry: item.result.targetGeometry,
+      route: item.result.route,
+      distanceMeters: item.result.distanceMeters,
+      similarityScore: item.result.similarityScore,
+      retracingMeters: item.result.retracingMeters,
+      score: item.score,
+      waypointCount: item.result.waypointCount,
+      warnings: item.result.warnings,
+    });
+    if (alternatives.length === 3) break;
+  }
+  const best = alternatives[0];
   if (best) {
+    const warnings = [
+      ...best.warnings,
+      `Best of ${ranked.length} viable placements searched within a ${(searchArea.radiusMeters / 1000).toFixed(1)} km radius.`,
+    ];
+    if (budgetMessage) warnings.push(budgetMessage);
     return {
-      ...best,
-      warnings: [
-        ...best.warnings,
-        `Best of ${placements.length} placements searched within a ${(searchArea.radiusMeters / 1000).toFixed(1)} km radius.`,
-      ],
+      ...ranked.find((item) => item.result.route === best.route)!.result,
+      warnings,
+      alternatives,
     };
   }
   return failure(
-    lastFailure?.code ?? 'no_route',
-    `No route was found in the selected area after trying ${placements.length} placements.${lastFailure ? ` ${lastFailure.message}` : ''}`,
+    budgetMessage ? 'optimization_budget' : (lastFailure?.code ?? 'no_route'),
+    budgetMessage
+      ? `No viable route was found before the search budget ended. ${budgetMessage}`
+      : `No route was found in the selected area after trying ${placements.length} placements.${lastFailure ? ` ${lastFailure.message}` : ''}`,
     lastFailure?.waypointIndex,
   );
 }

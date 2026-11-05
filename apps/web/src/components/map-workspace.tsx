@@ -84,6 +84,7 @@ export function MapWorkspace({
   const [routeResult, setRouteResult] = useState<RouteGenerationSuccess | null>(
     null,
   );
+  const [selectedAlternativeIndex, setSelectedAlternativeIndex] = useState(0);
   const [searchAreaRadiusMeters, setSearchAreaRadiusMeters] = useState<
     number | null
   >(null);
@@ -108,6 +109,16 @@ export function MapWorkspace({
         : EMPTY_FEATURES,
     [startPoint, searchAreaRadiusMeters],
   );
+  const activeAlternative =
+    routeResult?.alternatives?.[selectedAlternativeIndex] ?? null;
+  const activeRoute = activeAlternative?.route ?? routeResult?.route;
+  const activeDistance =
+    activeAlternative?.distanceMeters ?? routeResult?.distanceMeters;
+  const activeSimilarity =
+    activeAlternative?.similarityScore ?? routeResult?.similarityScore;
+  const activeRetracing =
+    activeAlternative?.retracingMeters ?? routeResult?.retracingMeters;
+  const activeWarnings = activeAlternative?.warnings ?? routeResult?.warnings;
 
   useEffect(() => () => searchController.current?.abort(), []);
 
@@ -133,6 +144,27 @@ export function MapWorkspace({
   function openDrawing() {
     setDrawingVisited(true);
     setStage('draw');
+  }
+
+  function showAlternative(index: number) {
+    const alternative = routeResult?.alternatives?.[index];
+    if (!alternative) return;
+    setSelectedAlternativeIndex(index);
+    setTargetGeometry({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          id: 'generation-target',
+          properties: { strokeId: 'target', label: 'Target shape' },
+          geometry: alternative.targetGeometry,
+        },
+      ],
+    });
+    setRouteGeometry({
+      type: 'FeatureCollection',
+      features: [alternative.route],
+    });
   }
 
   function applyCoordinates(event: FormEvent<HTMLFormElement>) {
@@ -465,14 +497,35 @@ export function MapWorkspace({
                     Clear route
                   </button>
                 </div>
+                {(routeResult.alternatives?.length ?? 0) > 1 && (
+                  <div
+                    className="route-alternative-list"
+                    role="group"
+                    aria-label="Route alternatives"
+                  >
+                    {routeResult.alternatives!.map((alternative, index) => (
+                      <button
+                        key={alternative.id}
+                        type="button"
+                        className="secondary-button"
+                        aria-pressed={selectedAlternativeIndex === index}
+                        onClick={() => showAlternative(index)}
+                      >
+                        Option {index + 1} ·{' '}
+                        {(alternative.distanceMeters / 1000).toFixed(2)} km ·{' '}
+                        {Math.round(alternative.similarityScore * 100)}% match
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <dl className="route-result-metrics">
                   <div>
                     <dt>Activity</dt>
-                    <dd>{routeResult.route.properties.mode}</dd>
+                    <dd>{activeRoute?.properties.mode}</dd>
                   </div>
                   <div>
                     <dt>Route distance</dt>
-                    <dd>{(routeResult.distanceMeters / 1000).toFixed(2)} km</dd>
+                    <dd>{((activeDistance ?? 0) / 1000).toFixed(2)} km</dd>
                   </div>
                   <div>
                     <dt>Requested</dt>
@@ -483,19 +536,27 @@ export function MapWorkspace({
                   </div>
                   <div>
                     <dt>Shape similarity</dt>
-                    <dd>{Math.round(routeResult.similarityScore * 100)}%</dd>
+                    <dd>{Math.round((activeSimilarity ?? 0) * 100)}%</dd>
+                  </div>
+                  <div>
+                    <dt>Retraced</dt>
+                    <dd>
+                      {activeDistance
+                        ? `${Math.round(((activeRetracing ?? 0) / activeDistance) * 100)}%`
+                        : '0%'}
+                    </dd>
                   </div>
                   <div>
                     <dt>Waypoints routed</dt>
                     <dd>{routeResult.waypointCount}</dd>
                   </div>
                 </dl>
-                {routeResult.warnings.length > 0 && (
+                {(activeWarnings?.length ?? 0) > 0 && (
                   <ul
                     className="route-result-warnings"
                     aria-label="Route warnings"
                   >
-                    {routeResult.warnings.map((warning) => (
+                    {activeWarnings?.map((warning) => (
                       <li key={warning}>{warning}</li>
                     ))}
                   </ul>
@@ -559,6 +620,7 @@ export function MapWorkspace({
             }}
             onGenerated={(result) => {
               setRouteResult(result);
+              setSelectedAlternativeIndex(0);
               setTargetGeometry({
                 type: 'FeatureCollection',
                 features: [

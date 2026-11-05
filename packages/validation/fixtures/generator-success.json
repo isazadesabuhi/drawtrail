@@ -21,6 +21,7 @@
   "distanceMeters": 1200,
   "requestedDistanceMeters": 3000,
   "similarityScore": 0.72,
+  "retracingMeters": 0,
   "waypointCount": 8,
   "warnings": [
     "Routed distance differs from the requested distance by more than 20%."

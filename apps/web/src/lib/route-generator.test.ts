@@ -97,12 +97,39 @@ describe('route generator', () => {
     expect(result.status).toBe('success');
     if (result.status !== 'success') return;
     expect(result.warnings).toContain(
-      'Best of 3 placements searched within a 2.0 km radius.',
+      'Best of 2 viable placements searched within a 2.0 km radius.',
     );
+    expect(result.alternatives?.[0]?.route).toEqual(result.route);
+    expect(result.alternatives?.length).toBeLessThanOrEqual(3);
     expect(callCount).toBe(1 + result.waypointCount * 2);
     expect(result.targetGeometry.coordinates[0]).not.toEqual(
       fixed.targetGeometry.coordinates[0],
     );
+  });
+
+  it('reports candidate progress without claiming fractional completion', async () => {
+    const request = await readRequest();
+    request.settings.searchArea = { radiusMeters: 1000, candidateCount: 3 };
+    const progress = vi.fn();
+    await generateRoute(request, fixtureRouter(), undefined, progress);
+    expect(progress.mock.calls).toEqual([
+      [{ stage: 'searching', completed: 1, total: 3 }],
+      [{ stage: 'searching', completed: 2, total: 3 }],
+      [{ stage: 'searching', completed: 3, total: 3 }],
+    ]);
+  });
+
+  it('returns a clear no-route failure when every area placement is impossible', async () => {
+    const request = await readRequest();
+    request.settings.searchArea = { radiusMeters: 1000, candidateCount: 2 };
+    const router: RouteSegmenter = async () => {
+      throw new ValhallaError('no_route', 'No connected path.');
+    };
+    await expect(generateRoute(request, router)).resolves.toMatchObject({
+      status: 'error',
+      code: 'no_route',
+      message: expect.stringContaining('after trying 2 placements'),
+    });
   });
 
   it('repeats the same bounded search for the same seed and settings', async () => {
@@ -143,6 +170,82 @@ describe('route generator', () => {
     ).resolves.toMatchObject({
       status: 'error',
       code: 'infeasible_waypoint',
+    });
+  });
+
+  it('rejects area candidates beyond a configured distance deviation', async () => {
+    const request = await readRequest();
+    request.bounds.radiusMeters = 7000;
+    request.settings.searchArea = {
+      radiusMeters: 1000,
+      candidateCount: 2,
+      maxDistanceDeviationRatio: 0.1,
+    };
+    const router: RouteSegmenter = async (mode, from, to) => ({
+      mode,
+      geometry: { type: 'LineString', coordinates: [from, to] },
+      distanceMeters: 1000,
+    });
+
+    await expect(generateRoute(request, router)).resolves.toMatchObject({
+      status: 'error',
+      code: 'no_route',
+      message: expect.stringContaining(
+        'configured 10% distance-deviation limit',
+      ),
+    });
+  });
+
+  it('keeps the best route when the request budget prevents more candidates', async () => {
+    const request = await readRequest();
+    request.bounds.radiusMeters = 7000;
+    request.settings.searchArea = {
+      radiusMeters: 1000,
+      candidateCount: 4,
+      maxRouterRequests: 7,
+    };
+    const router = vi.fn(fixtureRouter());
+
+    const result = await generateRoute(request, router);
+
+    expect(result.status).toBe('success');
+    if (result.status !== 'success') return;
+    expect(router).toHaveBeenCalledTimes(7);
+    expect(result.warnings).toContain(
+      'Search stopped at its 7-request routing limit.',
+    );
+  });
+
+  it('stops requesting routes when cancellation is signalled', async () => {
+    const request = await readRequest();
+    request.bounds.radiusMeters = 7000;
+    request.settings.searchArea = {
+      radiusMeters: 1000,
+      candidateCount: 4,
+    };
+    const controller = new AbortController();
+    const router = vi.fn(async (_mode: string, from: LngLat, to: LngLat) => {
+      controller.abort();
+      return fixtureRouter()('walking', from, to);
+    });
+
+    await expect(
+      generateRoute(request, router, controller.signal),
+    ).resolves.toMatchObject({ status: 'error', code: 'cancelled' });
+    expect(router).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a segment returned for a different activity mode', async () => {
+    const request = await readRequest();
+    const router: RouteSegmenter = async (_mode, from, to) => ({
+      mode: 'cycling',
+      geometry: { type: 'LineString', coordinates: [from, to] },
+      distanceMeters: 100,
+    });
+    await expect(generateRoute(request, router)).resolves.toMatchObject({
+      status: 'error',
+      code: 'invalid_response',
+      waypointIndex: 0,
     });
   });
 

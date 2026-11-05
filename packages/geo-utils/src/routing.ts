@@ -47,7 +47,7 @@ function turnAngle(points: readonly EastNorth[], index: number) {
   const previous = points[index - 1]!;
   const current = points[index]!;
   const next = points[index + 1]!;
-  const first = [previous[0] - current[0], previous[1] - current[1]];
+  const first = [current[0] - previous[0], current[1] - previous[1]];
   const second = [next[0] - current[0], next[1] - current[1]];
   const denominator = Math.hypot(...first) * Math.hypot(...second);
   if (denominator === 0) return 0;
@@ -143,7 +143,7 @@ export function scoreLineSimilarity(
   target: GeoJSONLineString,
   route: GeoJSONLineString,
   anchor: LngLat,
-): { score: number; normalizedError: number } {
+): { score: number; normalizedError: number; cornerError: number } {
   const targetPoints = metricPoints(target, anchor);
   const routePoints = metricPoints(route, anchor);
   const targetDistances = cumulativeLengths(targetPoints);
@@ -192,9 +192,76 @@ export function scoreLineSimilarity(
     ),
   );
   const normalizedError = symmetricMean / diagonal;
+  const targetCorners = targetPoints.filter(
+    (_, index) =>
+      index > 0 &&
+      index < targetPoints.length - 1 &&
+      turnAngle(targetPoints, index) >= (25 * Math.PI) / 180,
+  );
+  const cornerError =
+    targetCorners.length === 0
+      ? 0
+      : targetCorners.reduce(
+          (sum, point) =>
+            sum +
+            Math.min(
+              ...routeSamples.map((candidate) =>
+                Math.hypot(point[0] - candidate[0], point[1] - candidate[1]),
+              ),
+            ),
+          0,
+        ) /
+        targetCorners.length /
+        diagonal;
+  const combinedError = normalizedError * 0.8 + cornerError * 0.2;
   return {
-    score: Math.max(0, Math.min(1, 1 - normalizedError)),
-    normalizedError,
+    score: Math.max(0, Math.min(1, 1 - combinedError)),
+    normalizedError: combinedError,
+    cornerError,
+  };
+}
+
+/** Estimate repeated route distance by sampling the same small metric grid cells. */
+export function measureRetracing(
+  line: GeoJSONLineString,
+  anchor: LngLat,
+  cellSizeMeters = 6,
+): { repeatedMeters: number; percent: number } {
+  if (!Number.isFinite(cellSizeMeters) || cellSizeMeters < 1) {
+    throw new RangeError('Retracing grid cells must be at least one metre.');
+  }
+  const points = metricPoints(line, anchor);
+  const visited = new Map<string, number>();
+  let totalMeters = 0;
+  let repeatedMeters = 0;
+  let progressMeters = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1]!;
+    const end = points[index]!;
+    const length = Math.hypot(end[0] - start[0], end[1] - start[1]);
+    if (!Number.isFinite(length) || length <= 0) continue;
+    totalMeters += length;
+    const steps = Math.max(1, Math.ceil(length / (cellSizeMeters / 2)));
+    const sampleLength = length / steps;
+    for (let step = 0; step < steps; step += 1) {
+      const ratio = (step + 0.5) / steps;
+      const east = start[0] + (end[0] - start[0]) * ratio;
+      const north = start[1] + (end[1] - start[1]) * ratio;
+      const key = `${Math.floor(east / cellSizeMeters)}:${Math.floor(north / cellSizeMeters)}`;
+      const previousProgress = visited.get(key);
+      if (
+        previousProgress !== undefined &&
+        progressMeters + ratio * length - previousProgress > cellSizeMeters * 3
+      ) {
+        repeatedMeters += Math.min(cellSizeMeters, sampleLength * 2);
+      }
+      visited.set(key, progressMeters + ratio * length);
+    }
+    progressMeters += length;
+  }
+  return {
+    repeatedMeters: Math.min(totalMeters, repeatedMeters),
+    percent: totalMeters ? Math.min(1, repeatedMeters / totalMeters) : 0,
   };
 }
 

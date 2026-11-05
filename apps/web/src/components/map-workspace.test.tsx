@@ -268,7 +268,68 @@ describe('map workspace with a mocked renderer', () => {
       distanceMeters: 1800,
       requestedDistanceMeters: 3000,
       similarityScore: 0.82,
+      retracingMeters: 0,
       waypointCount: 8,
+      alternatives: [
+        {
+          id: 'route-1',
+          targetGeometry: {
+            type: 'LineString',
+            coordinates: [
+              [4.84, 45.77],
+              [4.8401, 45.7701],
+            ],
+          },
+          route: {
+            type: 'Feature',
+            properties: { mode: 'walking' },
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [4.84, 45.77],
+                [4.84005, 45.7702],
+                [4.8401, 45.7701],
+              ],
+            },
+          },
+          distanceMeters: 1800,
+          similarityScore: 0.82,
+          retracingMeters: 0,
+          score: 0.72,
+          waypointCount: 8,
+          warnings: [],
+        },
+        {
+          id: 'route-2',
+          targetGeometry: {
+            type: 'LineString',
+            coordinates: [
+              [4.841, 45.771],
+              [4.8411, 45.7711],
+            ],
+          },
+          route: {
+            type: 'Feature',
+            properties: { mode: 'walking' },
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [4.841, 45.771],
+                [4.84105, 45.7712],
+                [4.8411, 45.7711],
+              ],
+            },
+          },
+          distanceMeters: 2200,
+          similarityScore: 0.66,
+          retracingMeters: 200,
+          score: 0.61,
+          waypointCount: 8,
+          warnings: [
+            'The street route repeats approximately 9% of its distance.',
+          ],
+        },
+      ],
       warnings: [
         'Routed distance differs from the requested distance by more than 20%.',
       ],
@@ -300,12 +361,20 @@ describe('map workspace with a mocked renderer', () => {
       }),
     );
     fireEvent.click(
+      screen.getByLabelText('Enforce a maximum distance difference'),
+    );
+    expect(screen.getByLabelText('Maximum difference (%)')).toHaveValue(40);
+    fireEvent.click(
       screen.getByRole('button', { name: 'Generate street route' }),
     );
 
     expect(await screen.findByText('Generated street route')).toBeVisible();
     expect(screen.getByText('1.80 km')).toBeVisible();
     expect(screen.getByText('82%')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /Option 2 · 2.20 km/ }));
+    expect(screen.getByText('2.20 km')).toBeVisible();
+    expect(screen.getByText('66%')).toBeVisible();
+    expect(screen.getByText('9%')).toBeVisible();
     expect(screen.getByLabelText('Map geometry legend')).toHaveTextContent(
       'Actual street route (generated)',
     );
@@ -316,7 +385,13 @@ describe('map workspace with a mocked renderer', () => {
       targetDistanceKm: 3,
       loop: true,
       settings: {
-        searchArea: { radiusMeters: 2000, candidateCount: 8 },
+        searchArea: {
+          radiusMeters: 2000,
+          candidateCount: 8,
+          maxDistanceDeviationRatio: 0.4,
+          maxRuntimeMs: 30000,
+          maxRouterRequests: 80,
+        },
       },
     });
     expect(request.bounds.radiusMeters).toBeGreaterThan(3000);

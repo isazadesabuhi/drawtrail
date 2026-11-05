@@ -57,6 +57,55 @@ const presets: readonly PresetName[] = [
   'letter',
 ];
 
+async function readGenerationResponse(
+  response: Response,
+  onProgress: (completed: number, total: number) => void,
+): Promise<unknown> {
+  if (!response.headers.get('content-type')?.includes('text/event-stream')) {
+    return response.json().catch(() => null);
+  }
+  if (!response.body)
+    throw new Error('The route service returned an empty stream.');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const events = buffer.split('\n\n');
+    buffer = events.pop() ?? '';
+    for (const event of events) {
+      const type = event.match(/^event: (.+)$/m)?.[1];
+      const data = event.match(/^data: (.+)$/m)?.[1];
+      if (!type || !data) continue;
+      const parsed: unknown = JSON.parse(data);
+      if (
+        type === 'progress' &&
+        typeof parsed === 'object' &&
+        parsed !== null
+      ) {
+        const progress = parsed as { completed?: number; total?: number };
+        if (
+          Number.isFinite(progress.completed) &&
+          Number.isFinite(progress.total)
+        ) {
+          onProgress(progress.completed!, progress.total!);
+        }
+      } else if (type === 'result') {
+        return parsed;
+      } else if (type === 'error') {
+        throw new Error(
+          typeof parsed === 'object' && parsed !== null && 'message' in parsed
+            ? String(parsed.message)
+            : 'Route generation failed.',
+        );
+      }
+    }
+    if (done) break;
+  }
+  throw new Error('The route service ended before returning a result.');
+}
+
 export function DrawingEditor({
   startPoint = null,
   searchAreaRadiusMeters = null,
@@ -134,6 +183,8 @@ function DrawingSession({
   const [mode, setMode] = useState<ActivityMode>('walking');
   const [targetDistanceKm, setTargetDistanceKm] = useState('3');
   const [closeLoop, setCloseLoop] = useState(false);
+  const [maxDistanceDeviationPercent, setMaxDistanceDeviationPercent] =
+    useState<string | null>(null);
   const [placementIndex, setPlacementIndex] = useState(0);
   const uploadTicket = useRef(0);
   const generationController = useRef<AbortController | null>(null);
@@ -193,7 +244,10 @@ function DrawingSession({
     try {
       const response = await fetch('/api/v1/generate', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'content-type': 'application/json',
+          accept: 'text/event-stream, application/json',
+        },
         signal: controller.signal,
         body: JSON.stringify({
           drawing: { ...drawing, strokes: [selected] },
@@ -234,13 +288,26 @@ function DrawingSession({
                   searchArea: {
                     radiusMeters: searchAreaRadiusMeters,
                     candidateCount: 8,
+                    maxRuntimeMs: 30_000,
+                    maxRouterRequests: 80,
+                    ...(maxDistanceDeviationPercent === null
+                      ? {}
+                      : {
+                          maxDistanceDeviationRatio:
+                            Number(maxDistanceDeviationPercent) / 100,
+                        }),
                   },
                 }),
           },
         }),
       });
       const result = routeGenerationResponseSchema.safeParse(
-        await response.json().catch(() => null),
+        await readGenerationResponse(response, (completed, total) => {
+          setFeedback({
+            error: false,
+            text: `Searching route placements ${completed} of ${total}…`,
+          });
+        }),
       );
       if (!result.success) {
         throw new Error('The route service returned an unreadable response.');
@@ -613,6 +680,44 @@ function DrawingSession({
                         We’ll try 8 positions inside the circle and keep the
                         best route. The local routing graph must cover the area.
                       </p>
+                      <label
+                        className="loop-setting"
+                        htmlFor="distance-deviation-toggle"
+                      >
+                        <input
+                          id="distance-deviation-toggle"
+                          type="checkbox"
+                          checked={maxDistanceDeviationPercent !== null}
+                          onChange={(event) =>
+                            setMaxDistanceDeviationPercent(
+                              event.target.checked ? '40' : null,
+                            )
+                          }
+                        />
+                        Enforce a maximum distance difference
+                      </label>
+                      {maxDistanceDeviationPercent !== null && (
+                        <>
+                          <label htmlFor="distance-deviation-limit">
+                            Maximum difference (%)
+                          </label>
+                          <input
+                            id="distance-deviation-limit"
+                            type="number"
+                            min="5"
+                            max="100"
+                            step="5"
+                            value={maxDistanceDeviationPercent}
+                            onChange={(event) => {
+                              const value = Number(event.target.value);
+                              if (value >= 5 && value <= 100)
+                                setMaxDistanceDeviationPercent(
+                                  event.target.value,
+                                );
+                            }}
+                          />
+                        </>
+                      )}
                     </>
                   )}
                   <button

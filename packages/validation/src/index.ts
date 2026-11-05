@@ -156,6 +156,14 @@ export const routeGenerationRequestSchema = z
           .object({
             radiusMeters: z.number().finite().min(250).max(25_000),
             candidateCount: z.number().int().min(2).max(16),
+            maxDistanceDeviationRatio: z
+              .number()
+              .finite()
+              .min(0.05)
+              .max(2)
+              .optional(),
+            maxRuntimeMs: z.number().int().min(1000).max(120_000).optional(),
+            maxRouterRequests: z.number().int().min(1).max(512).optional(),
           })
           .strict()
           .optional(),
@@ -176,7 +184,38 @@ const routeGenerationErrorCodeSchema = z.enum([
   'cancelled',
   'route_discontinuity',
   'invalid_response',
+  'optimization_budget',
 ]);
+
+const routeGenerationAlternativeSchema = z
+  .object({
+    id: z.string().min(1).max(80),
+    targetGeometry: z
+      .object({
+        type: z.literal('LineString'),
+        coordinates: z.array(lngLatSchema).min(2),
+      })
+      .strict(),
+    route: z
+      .object({
+        type: z.literal('Feature'),
+        properties: z.object({ mode: activityModeSchema }).strict(),
+        geometry: z
+          .object({
+            type: z.literal('LineString'),
+            coordinates: z.array(lngLatSchema).min(2),
+          })
+          .strict(),
+      })
+      .strict(),
+    distanceMeters: z.number().finite().positive(),
+    similarityScore: z.number().finite().min(0).max(1),
+    retracingMeters: z.number().finite().min(0),
+    score: z.number().finite(),
+    waypointCount: z.number().int().min(2).max(32),
+    warnings: z.array(z.string().min(1)),
+  })
+  .strict();
 
 export const routeGenerationSuccessSchema = z
   .object({
@@ -202,8 +241,14 @@ export const routeGenerationSuccessSchema = z
     distanceMeters: z.number().finite().positive(),
     requestedDistanceMeters: z.number().finite().positive(),
     similarityScore: z.number().finite().min(0).max(1),
+    retracingMeters: z.number().finite().min(0),
     waypointCount: z.number().int().min(2).max(32),
     warnings: z.array(z.string().min(1)),
+    alternatives: z
+      .array(routeGenerationAlternativeSchema)
+      .min(1)
+      .max(3)
+      .optional(),
   })
   .strict();
 
@@ -227,6 +272,9 @@ export type RouteGenerationRequest = z.infer<
 >;
 export type RouteGenerationSuccess = z.infer<
   typeof routeGenerationSuccessSchema
+>;
+export type RouteGenerationAlternative = z.infer<
+  typeof routeGenerationAlternativeSchema
 >;
 export type RouteGenerationFailure = z.infer<
   typeof routeGenerationFailureSchema

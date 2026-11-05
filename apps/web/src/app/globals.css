@@ -1437,6 +1437,12 @@ footer p {
   height: 4px;
   border-radius: 2px;
 }
+.route-alternative-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
 .target-legend-swatch {
   background: #d27143;
 }
