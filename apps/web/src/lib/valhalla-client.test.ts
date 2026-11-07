@@ -106,6 +106,57 @@ describe('Valhalla client', () => {
     });
   });
 
+  it.each([
+    {
+      mode: 'cycling' as const,
+      hills: 'flatter' as const,
+      cyclingRoads: 'paths' as const,
+      cyclingSurface: 'paved' as const,
+      expected: {
+        use_hills: 0,
+        bicycle_type: 'road',
+        avoid_bad_surfaces: 0.9,
+        use_roads: 0,
+      },
+    },
+    {
+      mode: 'cycling' as const,
+      hills: 'hilly' as const,
+      cyclingRoads: 'roads' as const,
+      cyclingSurface: 'rough' as const,
+      expected: {
+        use_hills: 1,
+        bicycle_type: 'mountain',
+        avoid_bad_surfaces: 0,
+        use_roads: 0.8,
+      },
+    },
+    {
+      mode: 'running' as const,
+      hills: 'flatter' as const,
+      cyclingRoads: 'paths' as const,
+      cyclingSurface: 'paved' as const,
+      expected: { use_hills: 0 },
+    },
+  ])(
+    'sends $mode preferences to the correct costing model ($cyclingSurface)',
+    async ({ mode, hills, cyclingRoads, cyclingSurface, expected }) => {
+      const fetcher = vi.fn<typeof fetch>(async () => success());
+      const client = new ValhallaClient({
+        baseUrl: 'http://localhost:8002',
+        fetch: fetcher,
+      });
+      await client.route(mode, [1.5, 42], [1.50001, 42.00001], {
+        preferences: { hills, cyclingRoads, cyclingSurface },
+      });
+      const requestUrl = new URL(String(fetcher.mock.calls[0]?.[0]));
+      const request = JSON.parse(requestUrl.searchParams.get('json') ?? '{}');
+      expect(request.costing_options).toEqual({
+        [mode === 'cycling' ? 'bicycle' : 'pedestrian']: expected,
+      });
+    },
+  );
+
   it('rejects invalid coordinates before contacting Valhalla', async () => {
     const fetcher = vi.fn<typeof fetch>(async () => success());
     const client = new ValhallaClient({

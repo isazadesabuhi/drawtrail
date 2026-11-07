@@ -13,6 +13,7 @@ import type {
   RouteGenerationFailure,
   RouteGenerationAlternative,
   RouteGenerationRequest,
+  RoutePreferences,
   RouteGenerationResponse,
   RouteGenerationSuccess,
 } from '@drawtrail/validation';
@@ -23,6 +24,7 @@ export type RouteSegmenter = (
   from: LngLat,
   to: LngLat,
   signal?: AbortSignal,
+  preferences?: RoutePreferences,
 ) => Promise<ValhallaRoute>;
 
 function failure(
@@ -91,6 +93,7 @@ async function generateSingleRoute(
   request: RouteGenerationRequest,
   routeSegment: RouteSegmenter,
   signal?: AbortSignal,
+  shapeDistanceKm = request.targetDistanceKm ?? 3,
 ): Promise<RouteGenerationResponse> {
   if (request.drawing.strokes.length !== 1) {
     return failure(
@@ -113,8 +116,7 @@ async function generateSingleRoute(
   const spanX = Math.max(...xs) - Math.min(...xs);
   const spanY = Math.max(...ys) - Math.min(...ys);
   const scale = request.settings.placement.scale;
-  const metersPerNormalizedUnit =
-    (request.targetDistanceKm * 1000) / normalizedLength;
+  const metersPerNormalizedUnit = (shapeDistanceKm * 1000) / normalizedLength;
   let targetGeometry: ReturnType<typeof drawingToGeoJSON>;
   try {
     targetGeometry = drawingToGeoJSON(request.drawing, request.center, {
@@ -186,7 +188,13 @@ async function generateSingleRoute(
       );
     let segment: ValhallaRoute;
     try {
-      segment = await routeSegment(request.mode, from, to, signal);
+      segment = await routeSegment(
+        request.mode,
+        from,
+        to,
+        signal,
+        request.settings.preferences,
+      );
     } catch (error) {
       if (error instanceof SearchBudgetError) {
         return failure('optimization_budget', error.message, waypointIndex);
@@ -249,11 +257,14 @@ async function generateSingleRoute(
 
   const similarity = scoreLineSimilarity(target, routeLine, request.center);
   const retracing = measureRetracing(routeLine, request.center);
-  const requestedDistanceMeters = request.targetDistanceKm * 1000;
+  const requestedDistanceMeters =
+    request.targetDistanceKm === undefined
+      ? null
+      : request.targetDistanceKm * 1000;
   const warnings: string[] = [];
   if (
-    Math.abs(distance - requestedDistanceMeters) / requestedDistanceMeters >
-    0.2
+    requestedDistanceMeters !== null &&
+    Math.abs(distance - requestedDistanceMeters) / requestedDistanceMeters > 0.2
   ) {
     warnings.push(
       'Routed distance differs from the requested distance by more than 20%.',
@@ -354,14 +365,19 @@ export async function generateRoute(
   }) => void,
 ): Promise<RouteGenerationResponse> {
   const searchArea = request.settings.searchArea;
-  if (!searchArea) return generateSingleRoute(request, routeSegment, signal);
+  const unconstrainedDistance = request.targetDistanceKm === undefined;
+  if (!searchArea && !unconstrainedDistance)
+    return generateSingleRoute(request, routeSegment, signal);
+
+  const candidateCount = searchArea?.candidateCount ?? 6;
+  const searchRadiusMeters = searchArea?.radiusMeters ?? 0;
 
   let placements: ReturnType<typeof searchPlacements>;
   try {
     placements = searchPlacements(
       request.center,
-      searchArea.radiusMeters,
-      searchArea.candidateCount,
+      searchRadiusMeters,
+      candidateCount,
       request.settings.seed,
     );
   } catch (error) {
@@ -373,13 +389,19 @@ export async function generateRoute(
     );
   }
   const startedAt = Date.now();
-  const maxRuntimeMs = searchArea.maxRuntimeMs ?? 30_000;
+  const maxRuntimeMs = searchArea?.maxRuntimeMs ?? 30_000;
   const maxRouterRequests =
-    searchArea.maxRouterRequests ??
-    searchArea.candidateCount * (request.settings.maxWaypoints + 1);
+    searchArea?.maxRouterRequests ??
+    candidateCount * (request.settings.maxWaypoints + 1);
   let routerRequests = 0;
   let budgetMessage: string | undefined;
-  const boundedRouter: RouteSegmenter = async (mode, from, to, signal) => {
+  const boundedRouter: RouteSegmenter = async (
+    mode,
+    from,
+    to,
+    signal,
+    preferences,
+  ) => {
     if (signal?.aborted) {
       throw new ValhallaError('cancelled', 'Route search was cancelled.');
     }
@@ -394,10 +416,11 @@ export async function generateRoute(
       );
     }
     routerRequests += 1;
-    return routeSegment(mode, from, to, signal);
+    return routeSegment(mode, from, to, signal, preferences);
   };
   const ranked: Array<{ result: RouteGenerationSuccess; score: number }> = [];
   let lastFailure: RouteGenerationFailure | undefined;
+  const unconstrainedShapeDistancesKm = [2, 3.5, 5, 8, 12, 18];
   for (const [placementIndex, placement] of placements.entries()) {
     if (signal?.aborted) {
       return failure('cancelled', 'Area search was cancelled.');
@@ -428,6 +451,11 @@ export async function generateRoute(
       candidateRequest,
       boundedRouter,
       signal,
+      unconstrainedDistance
+        ? unconstrainedShapeDistancesKm[
+            placementIndex % unconstrainedShapeDistancesKm.length
+          ]
+        : request.targetDistanceKm,
     );
     onProgress?.({
       stage: 'searching',
@@ -450,10 +478,14 @@ export async function generateRoute(
       continue;
     }
     const relativeDistanceError =
-      Math.abs(candidate.distanceMeters - candidate.requestedDistanceMeters) /
-      candidate.requestedDistanceMeters;
+      candidate.requestedDistanceMeters === null
+        ? 0
+        : Math.abs(
+            candidate.distanceMeters - candidate.requestedDistanceMeters,
+          ) / candidate.requestedDistanceMeters;
     if (
-      searchArea.maxDistanceDeviationRatio !== undefined &&
+      candidate.requestedDistanceMeters !== null &&
+      searchArea?.maxDistanceDeviationRatio !== undefined &&
       relativeDistanceError > searchArea.maxDistanceDeviationRatio
     ) {
       lastFailure = failure(
@@ -468,7 +500,7 @@ export async function generateRoute(
         : 0;
     const score =
       candidate.similarityScore -
-      0.25 * relativeDistanceError -
+      (unconstrainedDistance ? 0 : 0.25 * relativeDistanceError) -
       0.15 * retracingRatio;
     ranked.push({ result: candidate, score });
   }
@@ -511,7 +543,9 @@ export async function generateRoute(
   if (best) {
     const warnings = [
       ...best.warnings,
-      `Best of ${ranked.length} viable placements searched within a ${(searchArea.radiusMeters / 1000).toFixed(1)} km radius.`,
+      searchArea
+        ? `Best of ${ranked.length} viable placements searched within a ${(searchArea.radiusMeters / 1000).toFixed(1)} km radius.`
+        : `Best shape match of ${ranked.length} viable route sizes at the selected map pin.`,
     ];
     if (budgetMessage) warnings.push(budgetMessage);
     return {
@@ -524,7 +558,9 @@ export async function generateRoute(
     budgetMessage ? 'optimization_budget' : (lastFailure?.code ?? 'no_route'),
     budgetMessage
       ? `No viable route was found before the search budget ended. ${budgetMessage}`
-      : `No route was found in the selected area after trying ${placements.length} placements.${lastFailure ? ` ${lastFailure.message}` : ''}`,
+      : searchArea
+        ? `No route was found in the selected area after trying ${placements.length} placements.${lastFailure ? ` ${lastFailure.message}` : ''}`
+        : `No route was found at the selected map pin after trying ${placements.length} shape sizes.${lastFailure ? ` ${lastFailure.message}` : ''}`,
     lastFailure?.waypointIndex,
   );
 }

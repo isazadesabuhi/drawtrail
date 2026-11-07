@@ -24,6 +24,35 @@ describe('route generation contracts', () => {
     });
   });
 
+  it('validates route preferences while accepting older requests without them', async () => {
+    const request = routeGenerationRequestSchema.parse(
+      await readFixture('generator-request.json'),
+    );
+    expect(request.settings.preferences).toBeUndefined();
+    const preferences = {
+      hills: 'flatter',
+      cyclingRoads: 'paths',
+      cyclingSurface: 'paved',
+    };
+    expect(
+      routeGenerationRequestSchema.parse({
+        ...request,
+        settings: { ...request.settings, preferences },
+      }).settings.preferences,
+    ).toEqual(preferences);
+    for (const field of ['hills', 'cyclingRoads', 'cyclingSurface']) {
+      expect(
+        routeGenerationRequestSchema.safeParse({
+          ...request,
+          settings: {
+            ...request.settings,
+            preferences: { ...preferences, [field]: 'unsupported' },
+          },
+        }).success,
+      ).toBe(false);
+    }
+  });
+
   it('accepts success and typed failure response examples', async () => {
     const success = await readFixture('generator-success.json');
     const failure = await readFixture('generator-failure.json');
@@ -53,5 +82,38 @@ describe('route generation contracts', () => {
         center: [181, 1.5],
       }),
     ).toHaveProperty('success', false);
+  });
+
+  it('allows best-shape-match requests without a requested distance', async () => {
+    const fixture = routeGenerationRequestSchema.parse(
+      await readFixture('generator-request.json'),
+    );
+    delete fixture.targetDistanceKm;
+    expect(routeGenerationRequestSchema.parse(fixture)).not.toHaveProperty(
+      'targetDistanceKm',
+    );
+    expect(
+      routeGenerationRequestSchema.safeParse({
+        ...fixture,
+        settings: {
+          ...fixture.settings,
+          searchArea: {
+            radiusMeters: 1000,
+            candidateCount: 3,
+            maxDistanceDeviationRatio: 0.2,
+          },
+        },
+      }).success,
+    ).toBe(false);
+
+    const success = routeGenerationSuccessSchema.parse(
+      await readFixture('generator-success.json'),
+    );
+    expect(
+      routeGenerationSuccessSchema.parse({
+        ...success,
+        requestedDistanceMeters: null,
+      }).requestedDistanceMeters,
+    ).toBeNull();
   });
 });

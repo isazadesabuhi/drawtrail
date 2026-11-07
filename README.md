@@ -2,7 +2,7 @@
 
 A local-first GPS art app: turn a simple drawing into a connected walking, running, or cycling route on real streets.
 
-This checkout includes **Phase 08 durable route-generation jobs** alongside the GPS-art workspace. At `/workspace`, choose an area center anywhere on the map, draw or import a shape, then optionally search an adjustable radius around that point. Review real street geometry, measured distance, shape similarity, alternatives, and warnings. Search is limited by the region loaded into Valhalla; the local Rhône-Alpes graph covers the Lyon workspace. Drawings and homepage artwork are target art, not navigable routes.
+This checkout includes **durable route-generation jobs and best-shape-match search** alongside the GPS-art workspace. At `/workspace`, choose an area center anywhere on the map, draw or import a shape, then search an adjustable radius or optionally let the optimizer compare several drawing sizes without a target distance. Review real street geometry, measured distance, shape similarity, alternatives, and warnings; selecting an alternative fits the map to that route. Search is limited by the region loaded into Valhalla; the local Rhône-Alpes graph covers the Lyon workspace. Drawings and homepage artwork are target art, not navigable routes.
 
 ## Requirements
 
@@ -65,6 +65,8 @@ CI installs Playwright's matching Chromium automatically. Local browser checks u
 Copy `.env.example` to the repository root for Docker Compose and the worker, and copy `apps/web/.env.example` to `apps/web/.env.local` for Next.js. These files contain local service URLs and development-only database credentials. The startup validator rejects invalid HTTP(S) Valhalla URLs without printing their contents. Never prefix server service configuration with `NEXT_PUBLIC_` or import it into browser components.
 
 Interactive development uses attributed OSM standard tiles by default. Production requires `NEXT_PUBLIC_MAP_STYLE_URL` and `NEXT_PUBLIC_MAP_ATTRIBUTION`; without them, coordinate selection still works and the map shows a configuration message. See [map development](docs/development/maps.md) for provider setup, service usage limits, search abstraction, coordinate conventions, and fixture-based tests. The start point stays in editor state while switching stages; map locations reset on reload.
+
+The generation form offers hill preferences for each activity and cycling preferences for roads, cycleways, and surface suitability. These affect routing when the loaded graph has the relevant data. The default local graph is built without elevation, so hill preferences need an elevation-enabled graph to influence climbs; elevation profiles remain planned. See [routing preferences](docs/development/routing.md#user-routing-preferences) and the improvement tasks in [tasks.md](tasks.md).
 
 Drawing drafts now survive reloads on the same browser/device. The map location and uploaded image files are not persisted. See [drawing inputs](docs/algorithm/drawing-inputs.md) for supported SVG geometry, file/model limits, keyboard shortcuts, stroke semantics, tracing limitations and privacy. PNG/JPEG import initially provides a preview; only an explicitly reviewed outline replaces the drawing.
 

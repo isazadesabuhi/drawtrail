@@ -10,6 +10,7 @@ export interface ViewRequest {
   center: LngLat;
   zoom: number;
   revision: number;
+  bounds?: [[number, number], [number, number]];
 }
 interface MapCanvasProps {
   configuration: MapConfiguration;
@@ -166,6 +167,13 @@ export function MapCanvas({
             paint: { 'line-color': '#d27143', 'line-width': 4 },
             layout: { 'line-cap': 'round', 'line-join': 'round' },
           });
+          if (viewRef.current.bounds) {
+            map?.fitBounds(viewRef.current.bounds, {
+              padding: 56,
+              maxZoom: 15,
+              duration: 450,
+            });
+          }
           if (!disposed && !sourceFailed) setStatus('ready');
         });
         map.on('error', () => {
@@ -238,12 +246,20 @@ export function MapCanvas({
 
   useEffect(() => {
     viewRef.current = view;
-    mapRef.current?.jumpTo({
-      center: [...view.center],
-      zoom: view.zoom,
-      bearing: 0,
-      pitch: 0,
-    });
+    if (view.bounds) {
+      mapRef.current?.fitBounds(view.bounds, {
+        padding: 56,
+        maxZoom: 15,
+        duration: 450,
+      });
+    } else {
+      mapRef.current?.jumpTo({
+        center: [...view.center],
+        zoom: view.zoom,
+        bearing: 0,
+        pitch: 0,
+      });
+    }
   }, [view]);
 
   useEffect(() => {

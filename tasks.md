@@ -907,6 +907,30 @@
 
 **Acceptance:** Users can delete feedback.
 
+## Phase 15 — Route insight and refinement (P2)
+
+Added at the user's request on 2026-11-07 after reviewing comparable route planners. This improvement work can proceed while the remaining original phases stay queued. Existing task IDs and acceptance criteria are preserved.
+
+Related work is already tracked: elevation profiles and ascent/descent in 14-05; GPX/GeoJSON/image export in 09-05 through 09-07; local route saving in 09-08; account route management in 10-04 and 10-05; public route sharing in 14-07. Complete those tasks rather than duplicating them here. Task 09-03 still covers shape-ranking controls; 15-01 adds street-routing preferences.
+
+### [x] 15-01 — Add street-routing preference presets
+
+**Scope:** Expose hill preference for walking, running, and cycling, plus cycling road comfort and surface suitability. Pass the validated preferences to every route segment in fixed, area, and best-shape searches, through web and worker generation.
+
+**Acceptance:** Form choices reach the correct Valhalla costing model; older requests without preferences still work; tests cover validation, form submission, API forwarding, and multi-candidate propagation. Surface choices identify the corresponding bicycle type. The UI explains that hill preferences need elevation data and other preferences depend on available streets.
+
+### [ ] 15-02 — Repair a generated route section
+
+**Scope:** Let users select a problematic section, adjust its routing waypoints, and regenerate while retaining a recoverable original route.
+
+**Acceptance:** Repaired output remains contiguous, obeys the selected activity, uses router-generated geometry, and refreshes distance, similarity, and retracing metrics. Undo restores the original route.
+
+### [ ] 15-03 — Estimate route moving time
+
+**Scope:** Show estimated moving time for the selected route and activity, with editable pace or speed and visible units.
+
+**Acceptance:** Switching alternatives updates the estimate; invalid pace/speed is rejected; tests cover walking/running/cycling unit conversions. Clearly distinguish the estimate from elapsed time including stops.
+
 ## Dependencies and changes
 
 - Implement phases 00–06 sequentially unless a specific task has no dependency. Within a phase, each task depends on the preceding relevant foundation, not necessarily every other task.
@@ -940,7 +964,7 @@ After the first task, replace **00-01** with the next chosen task ID.
 
 ## Living task registry
 
-Updated 2026-11-04. Work resumed at the user's request, phase by phase with tests. On Windows, TASKS.md and tasks.md refer to this same file. Original IDs and acceptance criteria are preserved.
+Updated 2026-11-07. Work resumed at the user's request, phase by phase with tests. On Windows, TASKS.md and tasks.md refer to this same file. Original IDs and acceptance criteria are preserved.
 
 Phase 00 documentation was reviewed against each acceptance criterion. Registry integrity is checked with `node tools/check-backlog.mjs`. Phase 01 passed local installation, formatting, lint, typecheck, unit/component tests, build, and desktop/mobile smoke. Hosted CI execution remains in review (01-10). Dependencies for future phases remain as documented above and will be refined when their phase begins.
 
@@ -1088,7 +1112,19 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 | 14-07 | todo   | See phase dependencies above | Not started.                                                                                                                                                |
 | 14-08 | todo   | See phase dependencies above | Not started.                                                                                                                                                |
 
+### Route refinement registry
+
+| ID    | Status | Dependencies        | Evidence / next action                                                                                                         |
+| ----- | ------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 15-01 | done   | 05-04, 06-01, 07-03 | UI, validation and web/worker routing wired; npm run check passed (184 tests and production build). Live Valhalla unavailable. |
+| 15-02 | todo   | 07-07, 09-02        | Add segment selection, waypoint repair, rerouting and undo with continuity checks.                                             |
+| 15-03 | todo   | 06-06, 09-02        | Add activity pace/speed input and selected-alternative moving-time estimate.                                                   |
+
 ### Decisions and changes
+
+- 2026-11-07: Completed 15-01. Validation, UI submission, JSON/SSE adapters, all candidate-search paths, and Valhalla costing mappings are covered by tests. Full npm run check passed: docs registry, formatting, lint, typecheck, 184 unit/component tests, and production build. Docker daemon and the local Valhalla endpoint were unavailable, so live routing effects were not verified. Elevation details (14-05) are the next improvement slice.
+
+- 2026-11-07: User authorized starting the route-planner improvements and recording them here. Added 15-01 through 15-03; existing elevation, export, saving, accounts, sharing, deployment and mobile tasks remain in place. Start with 15-01, then complete elevation details under 14-05. The current local routing setup disables elevation building, so hill preferences alone cannot guarantee a terrain-aware result. See docs/development/routing.md for preference semantics and elevation prerequisites.
 
 - 2026-11-04: User authorized phase-by-phase implementation with tests. No task definitions or IDs changed.
 - Phase 00 defines the web MVP; advanced features, deployment, and mobile remain deferred.

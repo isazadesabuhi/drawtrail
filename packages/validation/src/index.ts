@@ -1,6 +1,13 @@
 import { z } from 'zod';
 
 export const activityModeSchema = z.enum(['walking', 'running', 'cycling']);
+export const routePreferencesSchema = z
+  .object({
+    hills: z.enum(['flatter', 'balanced', 'hilly']),
+    cyclingRoads: z.enum(['paths', 'balanced', 'roads']),
+    cyclingSurface: z.enum(['paved', 'any', 'rough']),
+  })
+  .strict();
 
 /** WGS84/GeoJSON order. Regional bounds must also be checked by the editor. */
 export const lngLatSchema = z.tuple([
@@ -132,7 +139,7 @@ export const routeGenerationRequestSchema = z
     drawing: drawingSchema,
     center: lngLatSchema,
     mode: activityModeSchema,
-    targetDistanceKm: z.number().finite().min(0.2).max(20),
+    targetDistanceKm: z.number().finite().min(0.2).max(20).optional(),
     loop: z.boolean(),
     bounds: z
       .object({
@@ -152,6 +159,7 @@ export const routeGenerationRequestSchema = z
             offsetNorthMeters: z.number().finite().min(-50_000).max(50_000),
           })
           .strict(),
+        preferences: routePreferencesSchema.optional(),
         searchArea: z
           .object({
             radiusMeters: z.number().finite().min(250).max(25_000),
@@ -170,7 +178,19 @@ export const routeGenerationRequestSchema = z
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine((request, context) => {
+    if (
+      request.targetDistanceKm === undefined &&
+      request.settings.searchArea?.maxDistanceDeviationRatio !== undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['settings', 'searchArea', 'maxDistanceDeviationRatio'],
+        message: 'A maximum distance difference requires a target distance.',
+      });
+    }
+  });
 
 const routeGenerationErrorCodeSchema = z.enum([
   'invalid_request',
@@ -239,7 +259,7 @@ export const routeGenerationSuccessSchema = z
       })
       .strict(),
     distanceMeters: z.number().finite().positive(),
-    requestedDistanceMeters: z.number().finite().positive(),
+    requestedDistanceMeters: z.number().finite().positive().nullable(),
     similarityScore: z.number().finite().min(0).max(1),
     retracingMeters: z.number().finite().min(0),
     waypointCount: z.number().int().min(2).max(32),
@@ -358,6 +378,7 @@ export const generationJobStatusSchema = z
 export type RouteGenerationRequest = z.infer<
   typeof routeGenerationRequestSchema
 >;
+export type RoutePreferences = z.infer<typeof routePreferencesSchema>;
 export type RouteGenerationSuccess = z.infer<
   typeof routeGenerationSuccessSchema
 >;

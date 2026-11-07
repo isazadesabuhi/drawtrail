@@ -141,6 +141,33 @@ export function MapWorkspace({
     setView((previous) => ({ center, zoom, revision: previous.revision + 1 }));
   }
 
+  function fitRoute(route: RouteGenerationSuccess['route']) {
+    const coordinates = route.geometry.coordinates;
+    const longitudes = coordinates.map(([longitude]) => longitude);
+    const latitudes = coordinates.map(([, latitude]) => latitude);
+    let west = Math.min(...longitudes);
+    let east = Math.max(...longitudes);
+    let south = Math.min(...latitudes);
+    let north = Math.max(...latitudes);
+    if (east - west < 0.000001) {
+      west -= 0.00005;
+      east += 0.00005;
+    }
+    if (north - south < 0.000001) {
+      south -= 0.00005;
+      north += 0.00005;
+    }
+    setView((previous) => ({
+      center: [(west + east) / 2, (south + north) / 2],
+      zoom: previous.zoom,
+      revision: previous.revision + 1,
+      bounds: [
+        [west, south],
+        [east, north],
+      ],
+    }));
+  }
+
   function openDrawing() {
     setDrawingVisited(true);
     setStage('draw');
@@ -165,6 +192,7 @@ export function MapWorkspace({
       type: 'FeatureCollection',
       features: [alternative.route],
     });
+    fitRoute(alternative.route);
   }
 
   function applyCoordinates(event: FormEvent<HTMLFormElement>) {
@@ -527,13 +555,22 @@ export function MapWorkspace({
                     <dt>Route distance</dt>
                     <dd>{((activeDistance ?? 0) / 1000).toFixed(2)} km</dd>
                   </div>
-                  <div>
-                    <dt>Requested</dt>
-                    <dd>
-                      {(routeResult.requestedDistanceMeters / 1000).toFixed(2)}{' '}
-                      km
-                    </dd>
-                  </div>
+                  {routeResult.requestedDistanceMeters === null ? (
+                    <div>
+                      <dt>Distance preference</dt>
+                      <dd>Best shape match</dd>
+                    </div>
+                  ) : (
+                    <div>
+                      <dt>Requested</dt>
+                      <dd>
+                        {(routeResult.requestedDistanceMeters / 1000).toFixed(
+                          2,
+                        )}{' '}
+                        km
+                      </dd>
+                    </div>
+                  )}
                   <div>
                     <dt>Shape similarity</dt>
                     <dd>{Math.round((activeSimilarity ?? 0) * 100)}%</dd>
@@ -636,18 +673,7 @@ export function MapWorkspace({
                 type: 'FeatureCollection',
                 features: [result.route],
               });
-              const targetCoordinates = result.targetGeometry.coordinates;
-              const targetCenter: LngLat = [
-                targetCoordinates.reduce(
-                  (sum, [longitude]) => sum + longitude,
-                  0,
-                ) / targetCoordinates.length,
-                targetCoordinates.reduce(
-                  (sum, [, latitude]) => sum + latitude,
-                  0,
-                ) / targetCoordinates.length,
-              ];
-              centerOn(targetCenter, searchAreaRadiusMeters ? 13 : 15);
+              fitRoute(result.route);
               setStage('place');
             }}
           />

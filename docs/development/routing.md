@@ -45,6 +45,14 @@ OpenStreetMap data is licensed under the Open Database License (ODbL). Credit Op
 - Cycling requests use `bicycle` costing and support bicycle type and `use_roads` preferences. They can choose a different route from walking when the network and access tags provide alternatives.
 - The typed client distinguishes malformed input, disconnected paths, points outside the loaded graph, timeouts, caller cancellation, unavailable engine, and malformed responses. Network/server errors have bounded retries; invalid input and route misses do not.
 
+## User routing preferences
+
+Generation requests optionally include `settings.preferences` with `hills` (`flatter`, `balanced`, `hilly`), `cyclingRoads` (`paths`, `balanced`, `roads`), and `cyclingSurface` (`paved`, `any`, `rough`). Existing requests without this object retain the engine's previous defaults. The web form submits these preferences and the synchronous, streaming, and worker paths carry them through every segment, including candidate searches.
+
+Hill choices map to Valhalla `use_hills` values 0, 0.5, and 1 for both pedestrian and bicycle costing. “Hills are okay” removes hill-avoidance pressure; it does not actively seek climbs. Cycling road comfort maps to `use_roads` 0, 0.25, and 0.8. Surface suitability chooses road, hybrid, or mountain bicycle costing, with `avoid_bad_surfaces` 0.9, 0.2, or 0 respectively. These are preferences rather than hard surface guarantees; rough/gravel suitability permits those surfaces rather than requiring dirt. Walking and running do not receive bicycle options. See the [Valhalla costing reference](https://valhalla.github.io/valhalla/api/route/api-reference/) for the underlying options.
+
+The local Compose service currently uses `build_elevation: 'False'`. Hill preferences require elevation information in the routing graph to have a meaningful effect. Elevation profiles, ascent/descent, and coverage reporting remain task 14-05; they must distinguish missing elevation from genuinely flat terrain. Enabling elevation requires preparing elevation data and rebuilding the graph, which is a separate setup step. No elevation data is downloaded or graph volume replaced by the preference controls.
+
 ## Tests
 
 The standard `pnpm test` suite uses fixed response fixtures and does not need Docker. It verifies decoded geometry and distance, profile selection, bounded retries, cancellation, timeout, and normalized errors.

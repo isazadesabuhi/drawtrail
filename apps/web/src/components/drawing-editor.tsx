@@ -36,6 +36,7 @@ import {
   activityModeSchema,
   drawingSchema,
   routeGenerationSuccessSchema,
+  type RoutePreferences,
   type RouteGenerationSuccess,
 } from '@drawtrail/validation';
 import { readDrawingDraft, writeDrawingDraft } from '../lib/drawing-draft';
@@ -182,7 +183,14 @@ function DrawingSession({
   const [busy, setBusy] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [mode, setMode] = useState<ActivityMode>('walking');
+  const [hillPreference, setHillPreference] =
+    useState<RoutePreferences['hills']>('balanced');
+  const [cyclingRoads, setCyclingRoads] =
+    useState<RoutePreferences['cyclingRoads']>('balanced');
+  const [cyclingSurface, setCyclingSurface] =
+    useState<RoutePreferences['cyclingSurface']>('any');
   const [targetDistanceKm, setTargetDistanceKm] = useState('3');
+  const [bestShapeMatch, setBestShapeMatch] = useState(false);
   const [closeLoop, setCloseLoop] = useState(false);
   const [maxDistanceDeviationPercent, setMaxDistanceDeviationPercent] =
     useState<string | null>(null);
@@ -242,6 +250,7 @@ function DrawingSession({
     generationController.current = controller;
     setGenerating(true);
     setFeedback({ error: false, text: 'Finding a connected street route…' });
+    const boundsDistanceKm = bestShapeMatch ? 18 : Number(targetDistanceKm);
     try {
       const response = await fetch('/api/v1/generate', {
         method: 'POST',
@@ -254,7 +263,9 @@ function DrawingSession({
           drawing: { ...drawing, strokes: [selected] },
           center: startPoint,
           mode,
-          targetDistanceKm: Number(targetDistanceKm),
+          ...(bestShapeMatch
+            ? {}
+            : { targetDistanceKm: Number(targetDistanceKm) }),
           loop: closeLoop || selected.closed,
           bounds: {
             radiusMeters: Math.min(
@@ -262,7 +273,7 @@ function DrawingSession({
               Math.max(
                 1500,
                 (searchAreaRadiusMeters ?? 0) +
-                  Number(targetDistanceKm) * 1200 +
+                  boundsDistanceKm * 1200 +
                   (searchAreaRadiusMeters === null
                     ? Math.hypot(
                         candidate.offsetEastMeters,
@@ -277,6 +288,11 @@ function DrawingSession({
           settings: {
             maxWaypoints: 8,
             seed: `${drawing.name}:${selected.id}:${placementIndex}`,
+            preferences: {
+              hills: hillPreference,
+              cyclingRoads,
+              cyclingSurface,
+            },
             placement: {
               rotationDegrees: candidate.rotationDegrees,
               scale: candidate.scale,
@@ -291,7 +307,7 @@ function DrawingSession({
                     candidateCount: 8,
                     maxRuntimeMs: 30_000,
                     maxRouterRequests: 80,
-                    ...(maxDistanceDeviationPercent === null
+                    ...(maxDistanceDeviationPercent === null || bestShapeMatch
                       ? {}
                       : {
                           maxDistanceDeviationRatio:
@@ -619,18 +635,100 @@ function DrawingSession({
                     <option value="running">Running</option>
                     <option value="cycling">Cycling</option>
                   </select>
-                  <label htmlFor="target-distance">Target distance (km)</label>
-                  <input
-                    id="target-distance"
-                    type="number"
-                    min="0.2"
-                    max="20"
-                    step="0.1"
-                    value={targetDistanceKm}
+                  <label htmlFor="route-hills">Hill preference</label>
+                  <select
+                    id="route-hills"
+                    value={hillPreference}
                     onChange={(event) =>
-                      setTargetDistanceKm(event.target.value)
+                      setHillPreference(
+                        event.target.value as typeof hillPreference,
+                      )
                     }
-                  />
+                  >
+                    <option value="flatter">Prefer flatter routes</option>
+                    <option value="balanced">No strong preference</option>
+                    <option value="hilly">Hills are okay</option>
+                  </select>
+                  {mode === 'cycling' && (
+                    <>
+                      <label htmlFor="cycling-roads">
+                        Cycling road preference
+                      </label>
+                      <select
+                        id="cycling-roads"
+                        value={cyclingRoads}
+                        onChange={(event) =>
+                          setCyclingRoads(
+                            event.target.value as typeof cyclingRoads,
+                          )
+                        }
+                      >
+                        <option value="paths">
+                          Prefer paths and cycleways
+                        </option>
+                        <option value="balanced">Balanced</option>
+                        <option value="roads">Roads are okay</option>
+                      </select>
+                      <label htmlFor="cycling-surface">Cycling surface</label>
+                      <select
+                        id="cycling-surface"
+                        value={cyclingSurface}
+                        onChange={(event) =>
+                          setCyclingSurface(
+                            event.target.value as typeof cyclingSurface,
+                          )
+                        }
+                      >
+                        <option value="paved">Prefer paved (road bike)</option>
+                        <option value="any">
+                          Mixed surfaces (hybrid bike)
+                        </option>
+                        <option value="rough">
+                          Rough or gravel is okay (mountain bike)
+                        </option>
+                      </select>
+                    </>
+                  )}
+                  <p className="field-hint">
+                    Preferences can change the distance and shape match.
+                    Available streets may limit the result. Hill preferences
+                    need elevation data in the routing region.
+                  </p>
+                  <label className="loop-setting" htmlFor="best-shape-match">
+                    <input
+                      id="best-shape-match"
+                      type="checkbox"
+                      checked={bestShapeMatch}
+                      onChange={(event) =>
+                        setBestShapeMatch(event.target.checked)
+                      }
+                    />
+                    Find the best shape match (distance can vary)
+                  </label>
+                  {bestShapeMatch ? (
+                    <p className="field-hint">
+                      We’ll compare several shape sizes and prioritize how well
+                      the route matches your drawing. Route length depends on
+                      the selected activity; cycling may be longer.
+                    </p>
+                  ) : (
+                    <>
+                      <label htmlFor="target-distance">
+                        Target distance (km)
+                      </label>
+                      <input
+                        id="target-distance"
+                        type="number"
+                        min="0.2"
+                        max="20"
+                        step="0.1"
+                        value={targetDistanceKm}
+                        onChange={(event) =>
+                          setTargetDistanceKm(event.target.value)
+                        }
+                      />
+                    </>
+                  )}
                   <label className="loop-setting" htmlFor="close-route-loop">
                     <input
                       id="close-route-loop"
@@ -681,42 +779,46 @@ function DrawingSession({
                         We’ll try 8 positions inside the circle and keep the
                         best route. The local routing graph must cover the area.
                       </p>
-                      <label
-                        className="loop-setting"
-                        htmlFor="distance-deviation-toggle"
-                      >
-                        <input
-                          id="distance-deviation-toggle"
-                          type="checkbox"
-                          checked={maxDistanceDeviationPercent !== null}
-                          onChange={(event) =>
-                            setMaxDistanceDeviationPercent(
-                              event.target.checked ? '40' : null,
-                            )
-                          }
-                        />
-                        Enforce a maximum distance difference
-                      </label>
-                      {maxDistanceDeviationPercent !== null && (
+                      {!bestShapeMatch && (
                         <>
-                          <label htmlFor="distance-deviation-limit">
-                            Maximum difference (%)
-                          </label>
-                          <input
-                            id="distance-deviation-limit"
-                            type="number"
-                            min="5"
-                            max="100"
-                            step="5"
-                            value={maxDistanceDeviationPercent}
-                            onChange={(event) => {
-                              const value = Number(event.target.value);
-                              if (value >= 5 && value <= 100)
+                          <label
+                            className="loop-setting"
+                            htmlFor="distance-deviation-toggle"
+                          >
+                            <input
+                              id="distance-deviation-toggle"
+                              type="checkbox"
+                              checked={maxDistanceDeviationPercent !== null}
+                              onChange={(event) =>
                                 setMaxDistanceDeviationPercent(
-                                  event.target.value,
-                                );
-                            }}
-                          />
+                                  event.target.checked ? '40' : null,
+                                )
+                              }
+                            />
+                            Enforce a maximum distance difference
+                          </label>
+                          {maxDistanceDeviationPercent !== null && (
+                            <>
+                              <label htmlFor="distance-deviation-limit">
+                                Maximum difference (%)
+                              </label>
+                              <input
+                                id="distance-deviation-limit"
+                                type="number"
+                                min="5"
+                                max="100"
+                                step="5"
+                                value={maxDistanceDeviationPercent}
+                                onChange={(event) => {
+                                  const value = Number(event.target.value);
+                                  if (value >= 5 && value <= 100)
+                                    setMaxDistanceDeviationPercent(
+                                      event.target.value,
+                                    );
+                                }}
+                              />
+                            </>
+                          )}
                         </>
                       )}
                     </>

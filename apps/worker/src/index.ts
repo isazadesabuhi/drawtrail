@@ -67,13 +67,11 @@ const worker = new Worker(
             routeGenerationResponseSchema.parse(
               await generateRoute(
                 request,
-                (mode, from, to, routeSignal) =>
-                  router.route(
-                    mode,
-                    from,
-                    to,
-                    routeSignal ? { signal: routeSignal } : {},
-                  ),
+                (mode, from, to, routeSignal, preferences) =>
+                  router.route(mode, from, to, {
+                    ...(routeSignal ? { signal: routeSignal } : {}),
+                    ...(preferences ? { preferences } : {}),
+                  }),
                 signal,
                 onProgress,
               ),

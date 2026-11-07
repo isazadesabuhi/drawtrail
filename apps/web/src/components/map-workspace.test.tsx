@@ -23,6 +23,7 @@ interface FakeMap {
   emit: (name: string, point?: Point) => void;
   remove: ReturnType<typeof vi.fn>;
   jumpTo: ReturnType<typeof vi.fn>;
+  fitBounds: ReturnType<typeof vi.fn>;
   addControl: ReturnType<typeof vi.fn>;
   addSource: ReturnType<typeof vi.fn>;
   addLayer: ReturnType<typeof vi.fn>;
@@ -60,6 +61,12 @@ vi.mock('maplibre-gl', () => {
     jumpTo = vi.fn(({ center, zoom }: { center: Point; zoom: number }) => {
       this.center = center;
       this.zoom = zoom;
+      this.emit('moveend');
+    });
+    fitBounds = vi.fn((bounds: [Point, Point]) => {
+      const [[west, south], [east, north]] = bounds;
+      this.center = [(west + east) / 2, (south + north) / 2];
+      this.zoom = 12;
       this.emit('moveend');
     });
     constructor(options: {
@@ -379,6 +386,22 @@ describe('map workspace with a mocked renderer', () => {
     expect(screen.getByText('2.20 km')).toBeVisible();
     expect(screen.getByText('66%')).toBeVisible();
     expect(screen.getByText('9%')).toBeVisible();
+    expect(map.fitBounds).toHaveBeenLastCalledWith(
+      [
+        [4.841, 45.771],
+        [4.8411, 45.7712],
+      ],
+      { padding: 56, maxZoom: 15, duration: 450 },
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Option 1 · 1.80 km/ }));
+    expect(screen.getByText('1.80 km')).toBeVisible();
+    expect(map.fitBounds).toHaveBeenLastCalledWith(
+      [
+        [4.84, 45.77],
+        [4.8401, 45.7702],
+      ],
+      { padding: 56, maxZoom: 15, duration: 450 },
+    );
     expect(screen.getByLabelText('Map geometry legend')).toHaveTextContent(
       'Actual street route (generated)',
     );
@@ -449,6 +472,90 @@ describe('map workspace with a mocked renderer', () => {
     expect(
       engine.sources.get('drawtrail-route-geometry')?.setData,
     ).not.toHaveBeenCalled();
+  });
+
+  it('offers best-shape-match mode without a target distance and fits the result', async () => {
+    const result = {
+      status: 'success',
+      targetGeometry: {
+        type: 'LineString',
+        coordinates: [
+          [4.84, 45.77],
+          [4.841, 45.771],
+        ],
+      },
+      route: {
+        type: 'Feature',
+        properties: { mode: 'cycling' },
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [4.84, 45.77],
+            [4.8405, 45.7705],
+            [4.841, 45.771],
+          ],
+        },
+      },
+      distanceMeters: 7200,
+      requestedDistanceMeters: null,
+      similarityScore: 0.91,
+      retracingMeters: 0,
+      waypointCount: 8,
+      warnings: [],
+    };
+    const fetcher = vi.fn<typeof fetch>(
+      async () =>
+        new Response(JSON.stringify(apiSuccessEnvelope(result)), {
+          status: 200,
+        }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    render(<MapWorkspace configuration={configuration} />);
+    const map = await mountedMap();
+    act(() => map.emit('load'));
+    enterCoordinates('45.77', '4.84');
+    fireEvent.click(screen.getByRole('button', { name: /Draw your idea/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
+    expect(screen.queryByLabelText('Cycling surface')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Activity'), {
+      target: { value: 'cycling' },
+    });
+    fireEvent.change(screen.getByLabelText('Hill preference'), {
+      target: { value: 'flatter' },
+    });
+    fireEvent.change(screen.getByLabelText('Cycling road preference'), {
+      target: { value: 'paths' },
+    });
+    fireEvent.change(screen.getByLabelText('Cycling surface'), {
+      target: { value: 'paved' },
+    });
+    fireEvent.click(
+      screen.getByLabelText('Find the best shape match (distance can vary)'),
+    );
+    expect(screen.queryByLabelText('Target distance (km)')).toBeNull();
+    expect(screen.getByText(/cycling may be longer/i)).toBeVisible();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Generate street route' }),
+    );
+
+    expect(await screen.findByText('7.20 km')).toBeVisible();
+    expect(screen.getByText('Best shape match')).toBeVisible();
+    expect(screen.getByText('cycling')).toBeVisible();
+    const payload = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body));
+    expect(payload).not.toHaveProperty('targetDistanceKm');
+    expect(payload.mode).toBe('cycling');
+    expect(payload.settings.preferences).toEqual({
+      hills: 'flatter',
+      cyclingRoads: 'paths',
+      cyclingSurface: 'paved',
+    });
+    expect(map.fitBounds).toHaveBeenLastCalledWith(
+      [
+        [4.84, 45.77],
+        [4.841, 45.771],
+      ],
+      { padding: 56, maxZoom: 15, duration: 450 },
+    );
   });
 
   it('stores clicks and drags in editor state with explicit GeoJSON order', async () => {

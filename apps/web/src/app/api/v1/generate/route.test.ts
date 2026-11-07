@@ -4,7 +4,8 @@ import {
   routeGenerationResponseSchema,
 } from '@drawtrail/validation';
 import { apiSuccessEnvelope } from '@drawtrail/api-client';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ValhallaClient } from '../../../../lib/valhalla-client';
 
 vi.mock('../../../../lib/route-generator', () => ({
   generateRoute: vi.fn(),
@@ -27,6 +28,56 @@ async function fixture(name: string) {
 
 describe('POST /api/v1/generate progress streaming', () => {
   beforeEach(() => vi.clearAllMocks());
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each(['application/json', 'text/event-stream'])(
+    'forwards preferences through the %s router adapter',
+    async (accept) => {
+      const requestBody = routeGenerationRequestSchema.parse(
+        await fixture('generator-request'),
+      );
+      requestBody.mode = 'cycling';
+      requestBody.settings.preferences = {
+        hills: 'flatter',
+        cyclingRoads: 'paths',
+        cyclingSurface: 'paved',
+      };
+      const result = routeGenerationResponseSchema.parse(
+        await fixture('generator-success'),
+      );
+      const from = [1.5, 42] as const;
+      const to = [1.50001, 42.00001] as const;
+      const route = vi
+        .spyOn(ValhallaClient.prototype, 'route')
+        .mockResolvedValue({
+          mode: 'cycling',
+          geometry: { type: 'LineString', coordinates: [from, to] },
+          distanceMeters: 1250,
+        });
+      vi.mocked(generateRoute).mockImplementation(
+        async (body, router, signal) => {
+          await router(body.mode, from, to, signal, body.settings.preferences);
+          return result;
+        },
+      );
+      const response = await POST(
+        new Request('http://localhost/api/v1/generate', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept },
+          body: JSON.stringify(requestBody),
+        }),
+      );
+      await response.text();
+      expect(route).toHaveBeenCalledWith(
+        'cycling',
+        from,
+        to,
+        expect.objectContaining({
+          preferences: requestBody.settings.preferences,
+        }),
+      );
+    },
+  );
 
   it('streams discrete progress and the standard result event when requested', async () => {
     const requestBody = routeGenerationRequestSchema.parse(

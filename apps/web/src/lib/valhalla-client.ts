@@ -1,5 +1,5 @@
 import type { ActivityMode, LngLat } from '@drawtrail/types';
-import { lngLatSchema } from '@drawtrail/validation';
+import { lngLatSchema, type RoutePreferences } from '@drawtrail/validation';
 import { z } from 'zod';
 
 if (typeof window !== 'undefined') {
@@ -49,6 +49,7 @@ export interface RouteOptions {
   walkingSpeedKph?: number;
   bicycleType?: 'road' | 'cross' | 'hybrid' | 'mountain';
   useRoads?: number;
+  preferences?: RoutePreferences;
 }
 
 const valhallaResponseSchema = z.object({
@@ -242,6 +243,11 @@ export class ValhallaClient {
       format: 'json',
     };
     const costingOptions: Record<string, unknown> = {};
+    const hillPreference = options.preferences?.hills;
+    if (hillPreference) {
+      costingOptions.use_hills =
+        hillPreference === 'flatter' ? 0 : hillPreference === 'hilly' ? 1 : 0.5;
+    }
     if (costing === 'pedestrian') {
       if (options.walkingSpeedKph !== undefined) {
         if (
@@ -257,20 +263,35 @@ export class ValhallaClient {
         costingOptions.walking_speed = options.walkingSpeedKph;
       }
     } else {
-      if (options.bicycleType)
+      const surface = options.preferences?.cyclingSurface;
+      if (surface) {
+        costingOptions.bicycle_type =
+          surface === 'paved'
+            ? 'road'
+            : surface === 'rough'
+              ? 'mountain'
+              : 'hybrid';
+        costingOptions.avoid_bad_surfaces =
+          surface === 'paved' ? 0.9 : surface === 'rough' ? 0 : 0.2;
+      } else if (options.bicycleType) {
         costingOptions.bicycle_type = options.bicycleType;
-      if (options.useRoads !== undefined) {
-        if (
-          !Number.isFinite(options.useRoads) ||
-          options.useRoads < 0 ||
-          options.useRoads > 1
-        ) {
+      }
+      const roadPreference = options.preferences?.cyclingRoads;
+      const useRoads = roadPreference
+        ? roadPreference === 'paths'
+          ? 0
+          : roadPreference === 'roads'
+            ? 0.8
+            : 0.25
+        : options.useRoads;
+      if (useRoads !== undefined) {
+        if (!Number.isFinite(useRoads) || useRoads < 0 || useRoads > 1) {
           throw new ValhallaError(
             'invalid_waypoint',
             'Bicycle useRoads must be between 0 and 1.',
           );
         }
-        costingOptions.use_roads = options.useRoads;
+        costingOptions.use_roads = useRoads;
       }
     }
     if (Object.keys(costingOptions).length)

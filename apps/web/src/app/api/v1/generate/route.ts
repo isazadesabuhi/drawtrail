@@ -91,8 +91,11 @@ export async function POST(request: Request) {
       start(controller) {
         void generateRoute(
           parsed.data,
-          (mode, from, to, signal) =>
-            client.route(mode, from, to, signal ? { signal } : {}),
+          (mode, from, to, signal, preferences) =>
+            client.route(mode, from, to, {
+              ...(signal ? { signal } : {}),
+              ...(preferences ? { preferences } : {}),
+            }),
           request.signal,
           (progress) => {
             controller.enqueue(
@@ -147,8 +150,11 @@ export async function POST(request: Request) {
 
   const response = await generateRoute(
     parsed.data,
-    (mode, from, to, signal) =>
-      client.route(mode, from, to, signal ? { signal } : {}),
+    (mode, from, to, signal, preferences) =>
+      client.route(mode, from, to, {
+        ...(signal ? { signal } : {}),
+        ...(preferences ? { preferences } : {}),
+      }),
     request.signal,
   );
   const validated = routeGenerationResponseSchema.parse(response);

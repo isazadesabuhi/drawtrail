@@ -53,6 +53,96 @@ describe('route generator', () => {
     expect(firstRequest[1]).toEqual(result.targetGeometry.coordinates[0]);
   });
 
+  it('searches shape sizes and ranks by drawing match when no distance target is set', async () => {
+    const request = await readRequest();
+    delete request.targetDistanceKm;
+    request.bounds.radiusMeters = 25_000;
+    const router = vi.fn(fixtureRouter());
+
+    const result = await generateRoute(request, router);
+
+    expect(result.status).toBe('success');
+    if (result.status !== 'success') return;
+    expect(result.requestedDistanceMeters).toBeNull();
+    expect(result.warnings).toContain(
+      'Best shape match of 6 viable route sizes at the selected map pin.',
+    );
+    expect(router.mock.calls.length).toBeGreaterThan(result.waypointCount);
+    expect(result.alternatives?.[0]?.route).toEqual(result.route);
+  });
+
+  it('allows activity-specific actual distances without a distance target', async () => {
+    const walkingRequest = await readRequest();
+    delete walkingRequest.targetDistanceKm;
+    walkingRequest.bounds.radiusMeters = 25_000;
+    const cyclingRequest = structuredClone(walkingRequest);
+    cyclingRequest.mode = 'cycling';
+    const router: RouteSegmenter = async (mode, from, to) => {
+      const route = await fixtureRouter()(mode, from, to);
+      return {
+        ...route,
+        distanceMeters: route.distanceMeters * (mode === 'cycling' ? 1.5 : 1),
+      };
+    };
+
+    const walking = await generateRoute(walkingRequest, router);
+    const cycling = await generateRoute(cyclingRequest, router);
+
+    expect(walking.status).toBe('success');
+    expect(cycling.status).toBe('success');
+    if (walking.status !== 'success' || cycling.status !== 'success') return;
+    expect(walking.requestedDistanceMeters).toBeNull();
+    expect(cycling.requestedDistanceMeters).toBeNull();
+    expect(cycling.distanceMeters).toBeGreaterThan(walking.distanceMeters);
+    expect(cycling.route.properties.mode).toBe('cycling');
+  });
+
+  it('keeps area search available in best-shape-match mode without a length cap', async () => {
+    const request = await readRequest();
+    delete request.targetDistanceKm;
+    request.bounds.radiusMeters = 7000;
+    request.settings.searchArea = {
+      radiusMeters: 1000,
+      candidateCount: 2,
+    };
+
+    const result = await generateRoute(request, fixtureRouter());
+
+    expect(result.status).toBe('success');
+    if (result.status !== 'success') return;
+    expect(result.requestedDistanceMeters).toBeNull();
+    expect(result.warnings).toContain(
+      'Best of 2 viable placements searched within a 1.0 km radius.',
+    );
+  });
+
+  it.each(['fixed', 'area', 'best-shape'] as const)(
+    'preserves preferences and cancellation for every segment in %s generation',
+    async (search) => {
+      const request = await readRequest();
+      request.settings.preferences = {
+        hills: 'flatter',
+        cyclingRoads: 'paths',
+        cyclingSurface: 'paved',
+      };
+      request.bounds.radiusMeters = 25_000;
+      if (search === 'area') {
+        request.settings.searchArea = { radiusMeters: 1000, candidateCount: 3 };
+      }
+      if (search === 'best-shape') delete request.targetDistanceKm;
+      const router = vi.fn(fixtureRouter());
+      const signal = new AbortController().signal;
+      const result = await generateRoute(request, router, signal);
+
+      expect(result.status).toBe('success');
+      expect(router).toHaveBeenCalled();
+      for (const call of router.mock.calls) {
+        expect(call[3]).toBe(signal);
+        expect(call[4]).toEqual(request.settings.preferences);
+      }
+    },
+  );
+
   it('returns a typed missing-region failure for the fixed Lyon baseline with an Andorra graph', async () => {
     const request = await readRequest();
     request.center = [4.8357, 45.764];
