@@ -59,6 +59,36 @@ const result: RouteGenerationSuccess = {
 };
 
 describe('saved route library', () => {
+  it('requires location consent before publishing and shows the public link', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: '650fd6f4-44b1-4d90-8c95-78910e1c3df0' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <SavedRouteLibrary
+        currentResult={result}
+        selectedAlternativeIndex={0}
+        onOpen={vi.fn()}
+      />,
+    );
+    const publishButton = screen.getByRole('button', {
+      name: 'Create public link',
+    });
+    expect(publishButton).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/Publish the route for 30 days/));
+    fireEvent.click(publishButton);
+    expect(await screen.findByRole('link')).toHaveAttribute(
+      'href',
+      expect.stringContaining('/shared/650fd6f4-44b1-4d90-8c95-78910e1c3df0'),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/shares',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    vi.unstubAllGlobals();
+  });
+
   it('saves a named route, reopens it after remount, and removes it', async () => {
     const { unmount } = render(
       <SavedRouteLibrary

@@ -597,23 +597,23 @@
 
 **Acceptance:** Preview never zooms to wrong hemisphere.
 
-### [ ] 09-05 — Implement GPX export
+### [x] 09-05 — Implement GPX export
 
 **Scope:** Generate standards-compliant track with longitude/latitude order; include metadata.
 
-**Acceptance:** GPX parses in independent test library.
+**Acceptance:** GPX parses in independent test library. Browser XML parser tests cover generated metadata and longitude/latitude order.
 
-### [ ] 09-06 — Implement GeoJSON export
+### [x] 09-06 — Implement GeoJSON export
 
 **Scope:** Download standards-compliant LineString or MultiLineString as appropriate.
 
-**Acceptance:** Export reimport yields same geometry.
+**Acceptance:** Export reimport yields same geometry. Parsed export tests compare the original route coordinates.
 
-### [ ] 09-07 — Add shareable image export
+### [x] 09-07 — Add shareable image export
 
 **Scope:** Create visual PNG snapshot with attribution and route stats.
 
-**Acceptance:** Download works without leaking private draft.
+**Acceptance:** Download works without leaking private draft. The selected route card includes distance, activity, and map data attribution.
 
 ### [x] 09-08 — Add local route saving and reopening
 
@@ -895,11 +895,11 @@
 
 **Acceptance:** Out-of-coverage queries show actionable error.
 
-### [ ] 14-07 — Add public sharing opt-in
+### [x] 14-07 — Add public sharing opt-in
 
 **Scope:** User can publish selected route with location/privacy warnings.
 
-**Acceptance:** Private routes not accidentally exposed.
+**Acceptance:** Private routes not accidentally exposed. Publishing requires explicit location-sharing consent; shared links expire after 30 days.
 
 ### [ ] 14-08 — Add route-quality feedback collection
 
@@ -1067,9 +1067,9 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 | 09-02 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
 | 09-03 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
 | 09-04 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
-| 09-05 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
-| 09-06 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
-| 09-07 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
+| 09-05 | done   | See phase dependencies above | GPX 1.1 selected-route download, safe metadata, sanitized filename, and parser tests implemented; full check passed (239 tests and production build).                                               |
+| 09-06 | done   | See phase dependencies above | GeoJSON Feature download preserves selected route LineString and metadata; parsed round-trip tests and full check passed (239 tests and production build).                                          |
+| 09-07 | done   | See phase dependencies above | Attributed PNG route card uses only selected generated geometry; escaped names, distance, activity, and OSM credit included. Full check passed (239 tests and production build).                    |
 | 09-08 | done   | See phase dependencies above | Local named route library saves and reopens up to 20 routes; full check passed with 230 tests.                                                                                                      |
 | 09-09 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
 | 09-10 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
@@ -1115,7 +1115,7 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 | 14-04 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
 | 14-05 | done   | See phase dependencies above | Elevation profiles/ascent/descent implemented; automated checks, desktop browser journey, and live Lyon Valhalla graph plus `/height` health check passed. See docs/progress/phase-14-elevation.md. |
 | 14-06 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
-| 14-07 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
+| 14-07 | done   | See phase dependencies above | Explicit opt-in public link; shared route display, 30-day expiry, size bounds, and location warning implemented. Full check passed (234 tests and production build).                                |
 | 14-08 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
 
 ### Route refinement registry
@@ -1128,6 +1128,12 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 | 15-04 | done   | 14-05               | Sustained 8% grade sections over 60 m are shown from elevation samples; missing data and spikes are handled; full `npm run check` passed (225 tests and production build).                             |
 
 ### Decisions and changes
+
+- 2026-11-10: Completed 09-07. Added a downloadable PNG route card with selected geometry, route stats, escaped title, and OSM attribution. It does not receive the private sketch. Full `npm run check` passed: 239 tests and production build. See docs/progress/phase-09-07-shareable-route-image.md.
+
+- 2026-11-10: Completed 09-05 and 09-06. Added selected-alternative GPX 1.1 and GeoJSON downloads. GPX XML parse tests verify metadata and coordinate order; GeoJSON parses back to the same geometry. Full `npm run check` passed: 239 tests and production build. See docs/progress/phase-09-05-and-06-route-exports.md.
+
+- 2026-11-10: Completed 14-07. Added explicit route-location consent, expiring public share records, a public route preview, validation and payload size bounds, and PostgreSQL migration 002. Full `npm run check` passed: 234 tests and production build. See docs/progress/phase-14-07-public-route-sharing.md.
 
 - 2026-11-10: Completed 09-08. Added a browser-local named route library with validated versioned storage, reload reopening, selected-alternative restoration and map fit, removal, and storage limits. Full `npm run check` passed: 230 tests and production build. See docs/progress/phase-09-08-local-route-library.md.
 

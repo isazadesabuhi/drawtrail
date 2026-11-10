@@ -68,7 +68,9 @@ Interactive development uses attributed OSM standard tiles by default. Productio
 
 The generation form offers hill preferences for each activity and cycling preferences for roads, cycleways, and surface suitability. Results include an elevation profile and estimated ascent/descent when terrain data is available, with approximate sustained steep sections (8% grade over at least 60 m). Partial coverage shows gaps and withholds totals; unavailable elevation never becomes a false flat profile. Enable local terrain data with `pnpm routing:elevation:up`, then run `pnpm routing:elevation:health`. The first elevation build downloads data and rebuilds the graph. See [elevation setup](docs/development/routing.md#enable-elevation) for existing graphs and [tasks.md](tasks.md) for remaining improvements.
 
-Named routes can be saved to this browser and reopened after reload from **Saved routes**. The local library includes the selected alternative and route metrics; it does not sync across browsers or devices.
+Named routes can be saved to this browser and reopened after reload from **Saved routes**. The local library includes the selected alternative and route metrics; it does not sync across browsers or devices. Public links are a separate opt-in and expire after 30 days.
+
+The selected route alternative can also be downloaded as GPX 1.1, GeoJSON, or an attributed PNG route card. Exports include the generated route geometry and metadata, not the private draft drawing.
 
 Drawing drafts now survive reloads on the same browser/device. The map location and uploaded image files are not persisted. See [drawing inputs](docs/algorithm/drawing-inputs.md) for supported SVG geometry, file/model limits, keyboard shortcuts, stroke semantics, tracing limitations and privacy. PNG/JPEG import initially provides a preview; only an explicitly reviewed outline replaces the drawing.
 

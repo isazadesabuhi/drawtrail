@@ -3,6 +3,13 @@
 import { useMemo, useState, useSyncExternalStore, type FormEvent } from 'react';
 import type { RouteGenerationSuccess } from '@drawtrail/validation';
 import {
+  downloadTextFile,
+  downloadRoutePng,
+  safeExportName,
+  toGeoJson,
+  toGpx,
+} from '../lib/route-exports';
+import {
   parseSavedRoutes,
   removeSavedRoute,
   saveRouteLocally,
@@ -50,6 +57,8 @@ export function SavedRouteLibrary({
   );
   const routes = useMemo(() => parseSavedRoutes(storedRoutes), [storedRoutes]);
   const [name, setName] = useState('My route');
+  const [confirmSharing, setConfirmSharing] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
   const [message, setMessage] = useState(
     storedRoutes === unavailable
       ? 'Local route storage is unavailable in this browser.'
@@ -83,6 +92,93 @@ export function SavedRouteLibrary({
     }
   }
 
+  async function publish(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!currentResult || !confirmSharing) return;
+    const alternative = currentResult.alternatives?.[selectedAlternativeIndex];
+    const routeToPublish = alternative
+      ? {
+          ...currentResult,
+          targetGeometry: alternative.targetGeometry,
+          route: alternative.route,
+          elevation: alternative.elevation,
+          distanceMeters: alternative.distanceMeters,
+          similarityScore: alternative.similarityScore,
+          retracingMeters: alternative.retracingMeters,
+          waypointCount: alternative.waypointCount,
+          warnings: alternative.warnings,
+        }
+      : currentResult;
+    setMessage('Publishing route...');
+    try {
+      const response = await fetch('/api/v1/shares', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          route: routeToPublish,
+          locationSharingConfirmed: true,
+        }),
+      });
+      const data = (await response.json()) as {
+        id?: string;
+        error?: string;
+      };
+      if (!response.ok || !data.id)
+        throw new Error(data.error ?? 'Could not publish this route.');
+      const url = new URL(
+        `/shared/${data.id}`,
+        window.location.origin,
+      ).toString();
+      setShareUrl(url);
+      setMessage(
+        'Route published. Anyone with the link can view it for 30 days.',
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Could not publish this route.',
+      );
+    }
+  }
+
+  async function exportRoute(format: 'gpx' | 'geojson' | 'png') {
+    if (!currentResult) return;
+    const alternative = currentResult.alternatives?.[selectedAlternativeIndex];
+    const route = {
+      name,
+      mode:
+        alternative?.route.properties.mode ??
+        currentResult.route.properties.mode,
+      distanceMeters:
+        alternative?.distanceMeters ?? currentResult.distanceMeters,
+      geometry: alternative?.route.geometry ?? currentResult.route.geometry,
+    };
+    const basename = safeExportName(name);
+    if (format === 'gpx')
+      downloadTextFile(`${basename}.gpx`, toGpx(route), 'application/gpx+xml');
+    else if (format === 'geojson')
+      downloadTextFile(
+        `${basename}.geojson`,
+        toGeoJson(route),
+        'application/geo+json',
+      );
+    else {
+      setMessage('Preparing route image...');
+      try {
+        await downloadRoutePng(`${basename}.png`, route);
+        setMessage('Route image downloaded.');
+      } catch (error) {
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : 'Could not create the PNG image.',
+        );
+      }
+    }
+  }
+
   return (
     <section
       className="saved-route-library"
@@ -109,6 +205,58 @@ export function SavedRouteLibrary({
           </div>
         </form>
       )}
+      {currentResult && (
+        <div className="saved-route-exports" aria-label="Export current route">
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => exportRoute('gpx')}
+          >
+            Download GPX
+          </button>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => exportRoute('geojson')}
+          >
+            Download GeoJSON
+          </button>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => void exportRoute('png')}
+          >
+            Download route image
+          </button>
+        </div>
+      )}
+      {currentResult && (
+        <form className="saved-route-form" onSubmit={publish}>
+          <label className="share-location-consent">
+            <input
+              type="checkbox"
+              checked={confirmSharing}
+              onChange={(event) => setConfirmSharing(event.target.checked)}
+            />
+            <span>
+              Publish the route for 30 days. Anyone with the link can see its
+              full path, including the start and end locations.
+            </span>
+          </label>
+          <button
+            className="secondary-button"
+            type="submit"
+            disabled={!confirmSharing}
+          >
+            Create public link
+          </button>
+          {shareUrl && (
+            <p>
+              <a href={shareUrl}>{shareUrl}</a>
+            </p>
+          )}
+        </form>
+      )}
       {routes.length > 0 ? (
         <ul aria-label="Routes saved on this device">
           {routes.map((route) => (
@@ -123,7 +271,6 @@ export function SavedRouteLibrary({
                 <span>
                   {(route.result.distanceMeters / 1000).toFixed(2)} km
                   {' · '}
-                  {route.result.route.properties.mode}
                   {route.result.route.properties.mode}
                 </span>
               </button>
