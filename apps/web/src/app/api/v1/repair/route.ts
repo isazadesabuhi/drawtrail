@@ -10,6 +10,7 @@ import { ValhallaClient, ValhallaError } from '../../../../lib/valhalla-client';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 function errorResponse(code: string, message: string, status: number) {
   return Response.json(apiErrorEnvelope(code, message), { status });

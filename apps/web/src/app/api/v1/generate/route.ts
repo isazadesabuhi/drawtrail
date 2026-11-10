@@ -12,6 +12,7 @@ import {
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 function statusFor(code: string) {
   if (code === 'missing_region') return 404;
