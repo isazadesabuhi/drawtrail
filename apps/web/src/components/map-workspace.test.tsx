@@ -15,6 +15,7 @@ import type { Geocoder } from '../lib/geocoding';
 import type { MapConfiguration } from '../lib/map-config';
 import { MapWorkspace } from './map-workspace';
 import { summarizeElevation } from '../lib/elevation';
+import { SAVED_ROUTES_STORAGE_KEY } from '../lib/saved-routes';
 
 type Point = [number, number];
 type EventData = { lngLat: { lng: number; lat: number } };
@@ -44,6 +45,7 @@ const engine = vi.hoisted(() => ({
   >(),
   fail: false,
 }));
+const originalStorage = Object.getOwnPropertyDescriptor(window, 'localStorage');
 
 vi.mock('maplibre-gl', () => {
   class Map {
@@ -163,6 +165,21 @@ function enterCoordinates(latitude: string, longitude: string) {
 }
 
 beforeEach(() => {
+  const values = new Map<string, string>();
+  const storage: Storage = {
+    get length() {
+      return values.size;
+    },
+    clear: () => values.clear(),
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+    key: (index) => [...values.keys()][index] ?? null,
+  };
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: storage,
+  });
   engine.maps.length = 0;
   engine.markers.length = 0;
   engine.sources.clear();
@@ -172,6 +189,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  if (originalStorage)
+    Object.defineProperty(window, 'localStorage', originalStorage);
 });
 
 describe('map workspace with a mocked renderer', () => {
@@ -708,6 +727,67 @@ describe('map workspace with a mocked renderer', () => {
       '45.764000',
     );
     expect(engine.maps).toHaveLength(0);
+  });
+
+  it('reopens a saved route from local storage after a reload', async () => {
+    const savedResult = {
+      status: 'success',
+      targetGeometry: {
+        type: 'LineString',
+        coordinates: [
+          [4.83, 45.76],
+          [4.84, 45.77],
+        ],
+      },
+      route: {
+        type: 'Feature',
+        properties: { mode: 'walking' },
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [4.83, 45.76],
+            [4.835, 45.765],
+            [4.84, 45.77],
+          ],
+        },
+      },
+      distanceMeters: 1400,
+      requestedDistanceMeters: 1500,
+      similarityScore: 0.9,
+      retracingMeters: 10,
+      waypointCount: 4,
+      warnings: [],
+    };
+    window.localStorage.setItem(
+      SAVED_ROUTES_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        routes: [
+          {
+            id: 'saved-riverside',
+            name: 'Riverside loop',
+            savedAt: '2026-11-10T12:00:00.000Z',
+            selectedAlternativeIndex: 0,
+            result: savedResult,
+          },
+        ],
+      }),
+    );
+    render(<MapWorkspace configuration={configuration} />);
+    const map = await mountedMap();
+    act(() => map.emit('load'));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Open Riverside loop' }),
+    );
+    expect(screen.getByText('Generated street route')).toBeVisible();
+    expect(screen.getByText('1.40 km')).toBeVisible();
+    expect(map.fitBounds).toHaveBeenLastCalledWith(
+      [
+        [4.83, 45.76],
+        [4.84, 45.77],
+      ],
+      { padding: 56, maxZoom: 15, duration: 450 },
+    );
   });
 
   it('handles WebGL initialization failure without taking down coordinate selection', async () => {

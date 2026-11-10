@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react';
 import type { RouteElevation } from '@drawtrail/validation';
+import { findSteepSections } from '../lib/steep-sections';
 
 export function ElevationProfile({
   elevation,
@@ -24,6 +25,7 @@ export function ElevationProfile({
     );
   }
   const { samples } = elevation;
+  const steepSections = findSteepSections(samples);
   const known = samples.filter((point) => point.elevationMeters !== null);
   const heights = known.map((point) => point.elevationMeters!);
   const min = Math.min(...heights);
@@ -71,6 +73,35 @@ export function ElevationProfile({
           available. Full-route ascent and descent are unknown.
         </p>
       )}
+      <section className="steep-sections" aria-label="Steep sections">
+        <h4>Steep sections</h4>
+        <p className="field-hint">
+          Approximate grades of at least 8% sustained over 60 m.
+        </p>
+        {steepSections.length > 0 ? (
+          <ul>
+            {steepSections.map((section, index) => (
+              <li key={`${section.startDistanceMeters}-${index}`}>
+                <strong>
+                  {section.direction === 'climb' ? 'Climb' : 'Descent'} ·{' '}
+                  {section.gradePercent > 0 ? '+' : ''}
+                  {section.gradePercent.toFixed(1)}%
+                </strong>
+                <span>
+                  {(section.startDistanceMeters / 1000).toFixed(2)}–
+                  {(section.endDistanceMeters / 1000).toFixed(2)} km
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p role="status">
+            {elevation.status === 'partial'
+              ? 'No sustained steep sections detected in the available elevation data.'
+              : 'No sustained steep sections detected.'}
+          </p>
+        )}
+      </section>
       <svg
         viewBox="0 0 560 175"
         role="img"

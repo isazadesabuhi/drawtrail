@@ -4,6 +4,8 @@
 
 Elevation is optional metadata from Valhalla's digital terrain dataset, fetched only for shortlisted street routes. For a complete sampled profile, ascent is `sum(max(0, next_height - height))` and descent is `sum(max(0, height - next_height))`, in metres. These are unsmoothed terrain estimates at roughly 30 m spacing (capped at 1024 samples); noise and sampling density can change totals and small climbs may be missed. Missing heights stay null: partial coverage displays chart gaps and no full-route totals. A fully missing profile is unavailable, while genuine zero-metre elevations remain valid. Elevation does not alter the shape-ranking score. Tests cover known climb/descent totals, negative/zero heights, gaps, malformed data, and alternative selection.
 
+The route insight panel marks an approximate steep section only when at least two consecutive sampled intervals each reach an absolute grade of 8% or more, with the combined interval spanning at least 60 m. Grade is `(end_height - start_height) / horizontal_distance * 100`; climbs are positive and descents negative. A missing height, flat interval, or sign change ends a section, so the detector never bridges unknown terrain. This threshold limits isolated spikes, but terrain noise can still affect the result; steep sections are guidance rather than a road-surface or safety assessment.
+
 ## Route matching
 
 These are configurable engineering targets, not demonstrated performance. Only router-validated, contiguous network geometry can be eligible for export. Quality scores cannot override access or continuity failures.

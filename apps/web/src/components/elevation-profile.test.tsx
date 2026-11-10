@@ -51,4 +51,27 @@ describe('elevation profile', () => {
     expect(screen.getByRole('img')).toBeVisible();
     expect(screen.queryByText(/unknown/)).toBeNull();
   });
+
+  it('lists sustained climbs with the approximate grade and route range', () => {
+    render(
+      <ElevationProfile
+        elevation={summarizeElevation([0, 30, 60, 90], [100, 103, 106, 109])}
+      />,
+    );
+    const climb = screen.getByText('Climb · +10.0%');
+    expect(climb.closest('li')).toHaveTextContent('0.00–0.09 km');
+  });
+
+  it('reports when complete elevation data has no sustained steep sections', () => {
+    render(
+      <ElevationProfile
+        elevation={summarizeElevation([0, 30, 60], [100, 101, 100])}
+      />,
+    );
+    expect(
+      screen.getByText('No sustained steep sections detected.', {
+        exact: true,
+      }),
+    ).toHaveTextContent('No sustained steep sections detected.');
+  });
 });

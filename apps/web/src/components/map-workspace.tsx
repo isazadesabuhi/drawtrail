@@ -26,6 +26,8 @@ import { DrawingEditor } from './drawing-editor';
 import { ElevationProfile } from './elevation-profile';
 import { MovingTimeEstimate } from './moving-time-estimate';
 import { RouteRepairPanel } from './route-repair-panel';
+import { SavedRouteLibrary } from './saved-route-library';
+import type { SavedRoute } from '../lib/saved-routes';
 
 const EMPTY_FEATURES: GeoJSONFeatureCollection = {
   type: 'FeatureCollection',
@@ -262,6 +264,33 @@ export function MapWorkspace({
     setRouteGeometry({ type: 'FeatureCollection', features: [previousRoute] });
     setRepairUndo(null);
     fitRoute(previousRoute);
+  }
+
+  function openSavedRoute(saved: SavedRoute) {
+    const result = saved.result;
+    const alternativeIndex = Math.min(
+      saved.selectedAlternativeIndex,
+      Math.max(0, (result.alternatives?.length ?? 1) - 1),
+    );
+    const alternative = result.alternatives?.[alternativeIndex];
+    const route = alternative?.route ?? result.route;
+    setRouteResult(result);
+    setSelectedAlternativeIndex(alternativeIndex);
+    setRepairUndo(null);
+    setTargetGeometry({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          id: 'generation-target',
+          properties: { strokeId: 'target', label: 'Target shape' },
+          geometry: alternative?.targetGeometry ?? result.targetGeometry,
+        },
+      ],
+    });
+    setRouteGeometry({ type: 'FeatureCollection', features: [route] });
+    setStage('place');
+    fitRoute(route);
   }
 
   function applyCoordinates(event: FormEvent<HTMLFormElement>) {
@@ -695,6 +724,11 @@ export function MapWorkspace({
                 )}
               </section>
             )}
+            <SavedRouteLibrary
+              currentResult={routeResult}
+              selectedAlternativeIndex={selectedAlternativeIndex}
+              onOpen={openSavedRoute}
+            />
             <div className="map-attribution">
               <span>
                 {configuration.mode === 'development' ? (

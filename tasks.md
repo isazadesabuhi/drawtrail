@@ -615,11 +615,11 @@
 
 **Acceptance:** Download works without leaking private draft.
 
-### [ ] 09-08 — Add local route saving and reopening
+### [x] 09-08 — Add local route saving and reopening
 
 **Scope:** Until auth exists, save user routes locally or anonymous server records with explicit retention.
 
-**Acceptance:** Route opens after reload.
+**Acceptance:** Route opens after reload. Verified with browser storage and workspace map-fit tests.
 
 ### [ ] 09-09 — Improve empty, loading and failure UI
 
@@ -931,6 +931,12 @@ Related work is already tracked: elevation profiles and ascent/descent in 14-05;
 
 **Acceptance:** Switching alternatives updates the estimate; invalid pace/speed is rejected; tests cover walking/running/cycling unit conversions. Clearly distinguish the estimate from elapsed time including stops.
 
+### [x] 15-04 — Highlight sustained steep sections
+
+**Scope:** Identify and show approximate climbs and descents from the route's sampled elevation profile.
+
+**Acceptance:** Thresholds are visible; isolated spikes and missing-data gaps do not become steep sections; tests cover climbs, descents, short spikes, and partial data.
+
 ## Dependencies and changes
 
 - Implement phases 00–06 sequentially unless a specific task has no dependency. Within a phase, each task depends on the preceding relevant foundation, not necessarily every other task.
@@ -1064,7 +1070,7 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 | 09-05 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
 | 09-06 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
 | 09-07 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
-| 09-08 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
+| 09-08 | done   | See phase dependencies above | Local named route library saves and reopens up to 20 routes; full check passed with 230 tests.                                                                                                      |
 | 09-09 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
 | 09-10 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
 | 10-01 | todo   | See phase dependencies above | Not started.                                                                                                                                                                                        |
@@ -1119,8 +1125,13 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 | 15-01 | done   | 05-04, 06-01, 07-03 | UI, validation and web/worker routing wired; npm run check passed (184 tests and production build). Live Valhalla unavailable.                                                                         |
 | 15-02 | done   | 07-07, 09-02        | Section controls, optional via waypoint, Valhalla rerouting, 2 m continuity validation, updated metrics/elevation, and Undo implemented; full `npm run check` passed (219 tests and production build). |
 | 15-03 | done   | 06-06, 09-02        | Activity-specific pace/speed, selected-alternative estimates, invalid-rate handling, and walking/running/cycling conversion tests pass; full `npm run check` passed (211 tests and production build).  |
+| 15-04 | done   | 14-05               | Sustained 8% grade sections over 60 m are shown from elevation samples; missing data and spikes are handled; full `npm run check` passed (225 tests and production build).                             |
 
 ### Decisions and changes
+
+- 2026-11-10: Completed 09-08. Added a browser-local named route library with validated versioned storage, reload reopening, selected-alternative restoration and map fit, removal, and storage limits. Full `npm run check` passed: 230 tests and production build. See docs/progress/phase-09-08-local-route-library.md.
+
+- 2026-11-10: Completed 15-04. The profile reports sustained climbs/descents of at least 8% grade over 60 m, with signed grade and distance range. Missing samples, grade changes, and brief spikes end a section. README, generation guidance, and metric notes document the limits. Full `npm run check` passed: 225 tests and production build. See docs/progress/phase-15-04-steep-sections.md.
 
 - 2026-11-10: Completed 15-02. Added repair section range controls, optional via waypoint, and server-side rerouting through retained route waypoints in the selected activity. All output geometry is regenerated by Valhalla; segment joins over 2 m fail without a connector. Distance, similarity, retracing, warnings, elevation and selected-route estimates refresh. Undo restores the original route and alternative. Full `npm run check` passed: 219 tests and production build. See docs/progress/phase-15-02-route-repair.md.
 
