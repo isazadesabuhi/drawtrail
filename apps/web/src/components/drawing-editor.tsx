@@ -580,48 +580,47 @@ function DrawingSession({
             <h3 id="placement-title">Place it near your start</h3>
             {startPoint ? (
               <>
-                <p>
-                  Try one of 12 repeatable placements, fitted inside an 800 m
-                  square. This is a target preview; it is not snapped to
-                  streets.
-                </p>
-                <div className="placement-actions">
-                  <span aria-live="polite">
-                    Candidate {placementIndex + 1} of {placements.length}
-                  </span>
+                <p>The shape is placed near your start point automatically.</p>
+                <details className="placement-options">
+                  <summary>Adjust placement or preview on map</summary>
+                  <div className="placement-actions">
+                    <span aria-live="polite">
+                      Position {placementIndex + 1} of {placements.length}
+                    </span>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() =>
+                        setPlacementIndex(
+                          (index) => (index + 1) % placements.length,
+                        )
+                      }
+                      disabled={!placements.length}
+                    >
+                      Try another
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    className="secondary-button"
-                    onClick={() =>
-                      setPlacementIndex(
-                        (index) => (index + 1) % placements.length,
-                      )
-                    }
-                    disabled={!placements.length}
+                    className="secondary-button preview-target-button"
+                    disabled={!drawing.strokes.length || !placements.length}
+                    onClick={() => {
+                      const candidate = placements[placementIndex]!;
+                      onPreview(
+                        drawingToGeoJSON(drawing, startPoint, {
+                          widthMeters: 800,
+                          heightMeters: 800,
+                          scale: candidate.scale,
+                          rotationDegrees: candidate.rotationDegrees,
+                          offsetEastMeters: candidate.offsetEastMeters,
+                          offsetNorthMeters: candidate.offsetNorthMeters,
+                        }),
+                      );
+                    }}
                   >
-                    Try another placement
+                    Preview placement on map
                   </button>
-                </div>
-                <button
-                  type="button"
-                  className="primary-button"
-                  disabled={!drawing.strokes.length || !placements.length}
-                  onClick={() => {
-                    const candidate = placements[placementIndex]!;
-                    onPreview(
-                      drawingToGeoJSON(drawing, startPoint, {
-                        widthMeters: 800,
-                        heightMeters: 800,
-                        scale: candidate.scale,
-                        rotationDegrees: candidate.rotationDegrees,
-                        offsetEastMeters: candidate.offsetEastMeters,
-                        offsetNorthMeters: candidate.offsetNorthMeters,
-                      }),
-                    );
-                  }}
-                >
-                  Preview target on map <span aria-hidden="true">↗</span>
-                </button>
+                </details>
                 <div className="generation-settings">
                   <label htmlFor="route-activity">Activity</label>
                   <select
@@ -635,65 +634,70 @@ function DrawingSession({
                     <option value="running">Running</option>
                     <option value="cycling">Cycling</option>
                   </select>
-                  <label htmlFor="route-hills">Hill preference</label>
-                  <select
-                    id="route-hills"
-                    value={hillPreference}
-                    onChange={(event) =>
-                      setHillPreference(
-                        event.target.value as typeof hillPreference,
-                      )
-                    }
-                  >
-                    <option value="flatter">Prefer flatter routes</option>
-                    <option value="balanced">No strong preference</option>
-                    <option value="hilly">Hills are okay</option>
-                  </select>
-                  {mode === 'cycling' && (
-                    <>
-                      <label htmlFor="cycling-roads">
-                        Cycling road preference
-                      </label>
-                      <select
-                        id="cycling-roads"
-                        value={cyclingRoads}
-                        onChange={(event) =>
-                          setCyclingRoads(
-                            event.target.value as typeof cyclingRoads,
-                          )
-                        }
-                      >
-                        <option value="paths">
-                          Prefer paths and cycleways
-                        </option>
-                        <option value="balanced">Balanced</option>
-                        <option value="roads">Roads are okay</option>
-                      </select>
-                      <label htmlFor="cycling-surface">Cycling surface</label>
-                      <select
-                        id="cycling-surface"
-                        value={cyclingSurface}
-                        onChange={(event) =>
-                          setCyclingSurface(
-                            event.target.value as typeof cyclingSurface,
-                          )
-                        }
-                      >
-                        <option value="paved">Prefer paved (road bike)</option>
-                        <option value="any">
-                          Mixed surfaces (hybrid bike)
-                        </option>
-                        <option value="rough">
-                          Rough or gravel is okay (mountain bike)
-                        </option>
-                      </select>
-                    </>
-                  )}
-                  <p className="field-hint">
-                    Preferences can change the distance and shape match.
-                    Available streets may limit the result. Hill preferences
-                    need elevation data in the routing region.
-                  </p>
+                  <details className="advanced-route-options">
+                    <summary>Route preferences</summary>
+                    <label htmlFor="route-hills">Hill preference</label>
+                    <select
+                      id="route-hills"
+                      value={hillPreference}
+                      onChange={(event) =>
+                        setHillPreference(
+                          event.target.value as typeof hillPreference,
+                        )
+                      }
+                    >
+                      <option value="flatter">Prefer flatter routes</option>
+                      <option value="balanced">No strong preference</option>
+                      <option value="hilly">Hills are okay</option>
+                    </select>
+                    {mode === 'cycling' && (
+                      <>
+                        <label htmlFor="cycling-roads">
+                          Cycling road preference
+                        </label>
+                        <select
+                          id="cycling-roads"
+                          value={cyclingRoads}
+                          onChange={(event) =>
+                            setCyclingRoads(
+                              event.target.value as typeof cyclingRoads,
+                            )
+                          }
+                        >
+                          <option value="paths">
+                            Prefer paths and cycleways
+                          </option>
+                          <option value="balanced">Balanced</option>
+                          <option value="roads">Roads are okay</option>
+                        </select>
+                        <label htmlFor="cycling-surface">Cycling surface</label>
+                        <select
+                          id="cycling-surface"
+                          value={cyclingSurface}
+                          onChange={(event) =>
+                            setCyclingSurface(
+                              event.target.value as typeof cyclingSurface,
+                            )
+                          }
+                        >
+                          <option value="paved">
+                            Prefer paved (road bike)
+                          </option>
+                          <option value="any">
+                            Mixed surfaces (hybrid bike)
+                          </option>
+                          <option value="rough">
+                            Rough or gravel is okay (mountain bike)
+                          </option>
+                        </select>
+                      </>
+                    )}
+                    <p className="field-hint">
+                      Preferences can change the distance and shape match.
+                      Available streets may limit the result. Hill preferences
+                      need elevation data in the routing region.
+                    </p>
+                  </details>
                   <label className="loop-setting" htmlFor="best-shape-match">
                     <input
                       id="best-shape-match"
@@ -703,7 +707,7 @@ function DrawingSession({
                         setBestShapeMatch(event.target.checked)
                       }
                     />
-                    Find the best shape match (distance can vary)
+                    No fixed target distance (best shape match)
                   </label>
                   {bestShapeMatch ? (
                     <p className="field-hint">
@@ -729,100 +733,107 @@ function DrawingSession({
                       />
                     </>
                   )}
-                  <label className="loop-setting" htmlFor="close-route-loop">
-                    <input
-                      id="close-route-loop"
-                      type="checkbox"
-                      checked={closeLoop || (selected?.closed ?? false)}
-                      disabled={selected?.closed ?? false}
-                      onChange={(event) => setCloseLoop(event.target.checked)}
-                    />
-                    Close the route into a loop
-                  </label>
-                  <p className="field-hint">
-                    Closed drawings always route as loops. One stroke is routed
-                    at a time.
-                  </p>
-                  <label className="loop-setting" htmlFor="search-area-toggle">
-                    <input
-                      id="search-area-toggle"
-                      type="checkbox"
-                      checked={searchAreaRadiusMeters !== null}
-                      onChange={(event) =>
-                        onSearchAreaRadiusChange(
-                          event.target.checked ? 2000 : null,
-                        )
-                      }
-                    />
-                    Search for the shape around my chosen area
-                  </label>
-                  {searchAreaRadiusMeters !== null && (
-                    <>
-                      <label htmlFor="search-area-radius">
-                        Search radius around the map pin (km)
-                      </label>
+                  <details className="advanced-route-options">
+                    <summary>Loop and search area</summary>
+                    <label className="loop-setting" htmlFor="close-route-loop">
                       <input
-                        id="search-area-radius"
-                        type="number"
-                        min="0.25"
-                        max="25"
-                        step="0.25"
-                        value={searchAreaRadiusMeters / 1000}
-                        onChange={(event) => {
-                          const radiusMeters =
-                            Number(event.target.value) * 1000;
-                          if (radiusMeters >= 250 && radiusMeters <= 25_000)
-                            onSearchAreaRadiusChange(radiusMeters);
-                        }}
+                        id="close-route-loop"
+                        type="checkbox"
+                        checked={closeLoop || (selected?.closed ?? false)}
+                        disabled={selected?.closed ?? false}
+                        onChange={(event) => setCloseLoop(event.target.checked)}
                       />
-                      <p className="field-hint">
-                        We’ll try 8 positions inside the circle and keep the
-                        best route. The local routing graph must cover the area.
-                      </p>
-                      {!bestShapeMatch && (
-                        <>
-                          <label
-                            className="loop-setting"
-                            htmlFor="distance-deviation-toggle"
-                          >
-                            <input
-                              id="distance-deviation-toggle"
-                              type="checkbox"
-                              checked={maxDistanceDeviationPercent !== null}
-                              onChange={(event) =>
-                                setMaxDistanceDeviationPercent(
-                                  event.target.checked ? '40' : null,
-                                )
-                              }
-                            />
-                            Enforce a maximum distance difference
-                          </label>
-                          {maxDistanceDeviationPercent !== null && (
-                            <>
-                              <label htmlFor="distance-deviation-limit">
-                                Maximum difference (%)
-                              </label>
+                      Close the route into a loop
+                    </label>
+                    <p className="field-hint">
+                      Closed drawings always route as loops. One stroke is
+                      routed at a time.
+                    </p>
+                    <label
+                      className="loop-setting"
+                      htmlFor="search-area-toggle"
+                    >
+                      <input
+                        id="search-area-toggle"
+                        type="checkbox"
+                        checked={searchAreaRadiusMeters !== null}
+                        onChange={(event) =>
+                          onSearchAreaRadiusChange(
+                            event.target.checked ? 2000 : null,
+                          )
+                        }
+                      />
+                      Search for the shape around my chosen area
+                    </label>
+                    {searchAreaRadiusMeters !== null && (
+                      <>
+                        <label htmlFor="search-area-radius">
+                          Search radius around the map pin (km)
+                        </label>
+                        <input
+                          id="search-area-radius"
+                          type="number"
+                          min="0.25"
+                          max="25"
+                          step="0.25"
+                          value={searchAreaRadiusMeters / 1000}
+                          onChange={(event) => {
+                            const radiusMeters =
+                              Number(event.target.value) * 1000;
+                            if (radiusMeters >= 250 && radiusMeters <= 25_000)
+                              onSearchAreaRadiusChange(radiusMeters);
+                          }}
+                        />
+                        <p className="field-hint">
+                          We’ll try 8 positions inside the circle and keep the
+                          best route. The local routing graph must cover the
+                          area.
+                        </p>
+                        {!bestShapeMatch && (
+                          <>
+                            <label
+                              className="loop-setting"
+                              htmlFor="distance-deviation-toggle"
+                            >
                               <input
-                                id="distance-deviation-limit"
-                                type="number"
-                                min="5"
-                                max="100"
-                                step="5"
-                                value={maxDistanceDeviationPercent}
-                                onChange={(event) => {
-                                  const value = Number(event.target.value);
-                                  if (value >= 5 && value <= 100)
-                                    setMaxDistanceDeviationPercent(
-                                      event.target.value,
-                                    );
-                                }}
+                                id="distance-deviation-toggle"
+                                type="checkbox"
+                                checked={maxDistanceDeviationPercent !== null}
+                                onChange={(event) =>
+                                  setMaxDistanceDeviationPercent(
+                                    event.target.checked ? '40' : null,
+                                  )
+                                }
                               />
-                            </>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
+                              Enforce a maximum distance difference
+                            </label>
+                            {maxDistanceDeviationPercent !== null && (
+                              <>
+                                <label htmlFor="distance-deviation-limit">
+                                  Maximum difference (%)
+                                </label>
+                                <input
+                                  id="distance-deviation-limit"
+                                  type="number"
+                                  min="5"
+                                  max="100"
+                                  step="5"
+                                  value={maxDistanceDeviationPercent}
+                                  onChange={(event) => {
+                                    const value = Number(event.target.value);
+                                    if (value >= 5 && value <= 100)
+                                      setMaxDistanceDeviationPercent(
+                                        event.target.value,
+                                      );
+                                  }}
+                                />
+                              </>
+                            )}
+                          </>
+                        )}
+                      </>
+                    )}
+                  </details>
                   <button
                     type="button"
                     className="primary-button generate-route-button"
@@ -842,7 +853,7 @@ function DrawingSession({
               </p>
             )}
           </section>
-          <details className="drawing-tool-card" open>
+          <details className="drawing-tool-card">
             <summary>Move & shape</summary>
             <div className="transform-buttons">
               {transforms.map(({ label, options }) => (
@@ -861,7 +872,7 @@ function DrawingSession({
               Moves: 4% · turns: 15°. Geometry stays inside the canvas.
             </p>
           </details>
-          <details className="drawing-tool-card" open>
+          <details className="drawing-tool-card">
             <summary>Import a shape or image</summary>
             <label className="upload-label" htmlFor="drawing-upload">
               Choose SVG, PNG or JPEG

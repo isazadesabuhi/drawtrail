@@ -189,73 +189,85 @@ export function SavedRouteLibrary({
         Stored only in this browser. Clearing browser data removes these routes.
       </p>
       {currentResult && (
-        <form className="saved-route-form" onSubmit={save}>
-          <label htmlFor="saved-route-name">Route name</label>
-          <div>
-            <input
-              id="saved-route-name"
-              value={name}
-              maxLength={80}
-              onChange={(event) => setName(event.target.value)}
-              required
-            />
-            <button className="secondary-button" type="submit">
-              Save route
-            </button>
+        <details className="saved-route-actions">
+          <summary>Save, export, or share</summary>
+          <div className="saved-route-action-content">
+            {currentResult && (
+              <form className="saved-route-form" onSubmit={save}>
+                <label htmlFor="saved-route-name">Route name</label>
+                <div>
+                  <input
+                    id="saved-route-name"
+                    value={name}
+                    maxLength={80}
+                    onChange={(event) => setName(event.target.value)}
+                    required
+                  />
+                  <button className="secondary-button" type="submit">
+                    Save route
+                  </button>
+                </div>
+              </form>
+            )}
+            {currentResult && (
+              <div
+                className="saved-route-exports"
+                aria-label="Export current route"
+              >
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => exportRoute('gpx')}
+                >
+                  Download GPX
+                </button>
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => exportRoute('geojson')}
+                >
+                  Download GeoJSON
+                </button>
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => void exportRoute('png')}
+                >
+                  Download route image
+                </button>
+              </div>
+            )}
+            {currentResult && (
+              <form className="saved-route-form" onSubmit={publish}>
+                <label className="share-location-consent">
+                  <input
+                    type="checkbox"
+                    checked={confirmSharing}
+                    onChange={(event) =>
+                      setConfirmSharing(event.target.checked)
+                    }
+                  />
+                  <span>
+                    Publish the route for 30 days. Anyone with the link can see
+                    its full path, including the start and end locations.
+                  </span>
+                </label>
+                <button
+                  className="secondary-button"
+                  type="submit"
+                  disabled={!confirmSharing}
+                >
+                  Create public link
+                </button>
+                {shareUrl && (
+                  <p>
+                    <a href={shareUrl}>{shareUrl}</a>
+                  </p>
+                )}
+              </form>
+            )}
           </div>
-        </form>
-      )}
-      {currentResult && (
-        <div className="saved-route-exports" aria-label="Export current route">
-          <button
-            className="text-button"
-            type="button"
-            onClick={() => exportRoute('gpx')}
-          >
-            Download GPX
-          </button>
-          <button
-            className="text-button"
-            type="button"
-            onClick={() => exportRoute('geojson')}
-          >
-            Download GeoJSON
-          </button>
-          <button
-            className="text-button"
-            type="button"
-            onClick={() => void exportRoute('png')}
-          >
-            Download route image
-          </button>
-        </div>
-      )}
-      {currentResult && (
-        <form className="saved-route-form" onSubmit={publish}>
-          <label className="share-location-consent">
-            <input
-              type="checkbox"
-              checked={confirmSharing}
-              onChange={(event) => setConfirmSharing(event.target.checked)}
-            />
-            <span>
-              Publish the route for 30 days. Anyone with the link can see its
-              full path, including the start and end locations.
-            </span>
-          </label>
-          <button
-            className="secondary-button"
-            type="submit"
-            disabled={!confirmSharing}
-          >
-            Create public link
-          </button>
-          {shareUrl && (
-            <p>
-              <a href={shareUrl}>{shareUrl}</a>
-            </p>
-          )}
-        </form>
+        </details>
       )}
       {routes.length > 0 ? (
         <ul aria-label="Routes saved on this device">

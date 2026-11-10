@@ -72,6 +72,10 @@ describe('saved route library', () => {
         onOpen={vi.fn()}
       />,
     );
+    expect(
+      screen.getByText('Save, export, or share').closest('details'),
+    ).toHaveProperty('open', false);
+    fireEvent.click(screen.getByText('Save, export, or share'));
     const publishButton = screen.getByRole('button', {
       name: 'Create public link',
     });
@@ -97,6 +101,7 @@ describe('saved route library', () => {
         onOpen={vi.fn()}
       />,
     );
+    fireEvent.click(screen.getByText('Save, export, or share'));
     fireEvent.change(screen.getByLabelText('Route name'), {
       target: { value: 'Morning loop' },
     });

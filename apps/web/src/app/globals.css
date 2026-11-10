@@ -754,6 +754,49 @@ footer p {
   padding-top: 14px;
   border-top: 1px solid var(--line);
 }
+.generation-settings .advanced-route-options,
+.placement-options,
+.route-details,
+.route-repair-details,
+.saved-route-actions {
+  border: 1px solid #e1e6d9;
+  border-radius: 6px;
+  background: #f8f9f4;
+}
+.generation-settings .advanced-route-options,
+.placement-options {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+.generation-settings .advanced-route-options summary,
+.placement-options summary,
+.route-details summary,
+.route-repair-details summary,
+.saved-route-actions summary {
+  color: #52604d;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.generation-settings .advanced-route-options summary,
+.placement-options summary {
+  margin: 0;
+}
+.generation-settings .advanced-route-options[open] summary,
+.placement-options[open] summary {
+  margin-bottom: 3px;
+}
+.placement-options > p {
+  margin: 0;
+  color: #72796e;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.preview-target-button {
+  width: 100%;
+  justify-content: center;
+}
 .generation-settings > label:not(.loop-setting) {
   margin: 2px 0 -4px;
   color: #52604d;
@@ -1334,6 +1377,18 @@ footer p {
   gap: 12px;
   margin: 0;
 }
+.route-details,
+.route-repair-details {
+  margin-top: 12px;
+  padding: 11px 13px;
+}
+.route-details[open] > summary,
+.route-repair-details[open] > summary {
+  margin-bottom: 12px;
+}
+.route-details > .route-result-metrics {
+  margin-bottom: 14px;
+}
 .route-result-metrics div {
   min-width: 0;
 }
@@ -1507,6 +1562,17 @@ footer p {
   display: grid;
   gap: 6px;
   margin-top: 10px;
+}
+.saved-route-actions {
+  margin-top: 10px;
+  padding: 11px 12px;
+}
+.saved-route-actions[open] > summary {
+  margin-bottom: 10px;
+}
+.saved-route-action-content {
+  display: grid;
+  gap: 7px;
 }
 .saved-route-form label {
   color: #72796e;

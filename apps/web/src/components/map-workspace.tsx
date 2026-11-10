@@ -329,12 +329,12 @@ export function MapWorkspace({
           <h1>
             {stage === 'place'
               ? 'Choose an area for your route.'
-              : 'Draw a little adventure.'}
+              : 'Draw your idea.'}
           </h1>
           <p>
             {stage === 'place'
-              ? 'Set a point anywhere on the map. Routes can only use streets in the loaded map graph.'
-              : 'A few simple lines today. A different way to move tomorrow.'}
+              ? 'Choose a start point. Routes work only where street data is loaded; this local setup covers Rhône-Alpes.'
+              : 'Draw a shape or choose a preset. You can generate a route without previewing first.'}
           </p>
         </div>
         <div className="editor-heading-actions">
@@ -343,7 +343,7 @@ export function MapWorkspace({
             type="button"
             onClick={openDrawing}
           >
-            Start drawing <span aria-hidden="true">↗</span>
+            Draw your idea
           </button>
           <span className="editor-region">
             <span aria-hidden="true">↗</span> Choose an area
@@ -363,14 +363,16 @@ export function MapWorkspace({
           className={stage === 'draw' ? 'current-step' : ''}
           aria-current={stage === 'draw' ? 'step' : undefined}
         >
-          <button type="button" onClick={openDrawing}>
-            <span>02</span> Draw your idea
-          </button>
+          <span>02</span> Draw your idea
         </li>
         <li>
           <span>03</span> Find a street route{' '}
           <small>
-            {routeResult ? 'Baseline generated' : 'Generate from a stroke'}
+            {routeResult
+              ? 'Route ready'
+              : stage === 'draw'
+                ? 'Generate from your drawing'
+                : 'Draw a shape first'}
           </small>
         </li>
       </ol>
@@ -385,7 +387,7 @@ export function MapWorkspace({
                 adjust it.
               </p>
               <form onSubmit={search} role="search" className="place-search">
-                <label htmlFor="place-query">Search Lyon places</label>
+                <label htmlFor="place-query">Search local places</label>
                 <div className="search-field-row">
                   <input
                     id="place-query"
@@ -393,7 +395,7 @@ export function MapWorkspace({
                     value={query}
                     disabled={!geocoder}
                     maxLength={120}
-                    placeholder="Try Bellecour or Terreaux"
+                    placeholder="Try Bellecour"
                     onChange={(event) => {
                       searchController.current?.abort();
                       setQuery(event.target.value);
@@ -415,7 +417,7 @@ export function MapWorkspace({
                 </div>
                 <p className="field-hint">
                   {geocoder
-                    ? `${geocoder.label} Â· a small place catalog, not address search. Coordinates work anywhere.`
+                    ? `${geocoder.label} is a small place list, not full address search. Use coordinates for other places.`
                     : 'Place search is disabled. The map and coordinates still work.'}
                 </p>
               </form>
@@ -663,64 +665,72 @@ export function MapWorkspace({
                     <dt>Route distance</dt>
                     <dd>{((activeDistance ?? 0) / 1000).toFixed(2)} km</dd>
                   </div>
-                  {routeResult.requestedDistanceMeters === null ? (
-                    <div>
-                      <dt>Distance preference</dt>
-                      <dd>Best shape match</dd>
-                    </div>
-                  ) : (
-                    <div>
-                      <dt>Requested</dt>
-                      <dd>
-                        {(routeResult.requestedDistanceMeters / 1000).toFixed(
-                          2,
-                        )}{' '}
-                        km
-                      </dd>
-                    </div>
-                  )}
-                  <div>
-                    <dt>Shape similarity</dt>
-                    <dd>{Math.round((activeSimilarity ?? 0) * 100)}%</dd>
-                  </div>
-                  <div>
-                    <dt>Retraced</dt>
-                    <dd>
-                      {activeDistance
-                        ? `${Math.round(((activeRetracing ?? 0) / activeDistance) * 100)}%`
-                        : '0%'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Waypoints routed</dt>
-                    <dd>{routeResult.waypointCount}</dd>
-                  </div>
                 </dl>
-                <ElevationProfile
-                  key={selectedAlternativeIndex}
-                  elevation={activeElevation}
-                />
                 <MovingTimeEstimate
                   mode={activeRoute?.properties.mode ?? 'walking'}
                   distanceMeters={activeDistance ?? 0}
                 />
-                {activeRoute && activeTargetGeometry && (
-                  <RouteRepairPanel
-                    mode={activeRoute.properties.mode}
-                    route={activeRoute}
-                    targetGeometry={activeTargetGeometry}
-                    onRepaired={handleRouteRepaired}
+                <details className="route-details">
+                  <summary>Route details</summary>
+                  <dl className="route-result-metrics">
+                    {routeResult.requestedDistanceMeters === null ? (
+                      <div>
+                        <dt>Distance preference</dt>
+                        <dd>Best shape match</dd>
+                      </div>
+                    ) : (
+                      <div>
+                        <dt>Requested</dt>
+                        <dd>
+                          {(routeResult.requestedDistanceMeters / 1000).toFixed(
+                            2,
+                          )}{' '}
+                          km
+                        </dd>
+                      </div>
+                    )}
+                    <div>
+                      <dt>Shape similarity</dt>
+                      <dd>{Math.round((activeSimilarity ?? 0) * 100)}%</dd>
+                    </div>
+                    <div>
+                      <dt>Retraced</dt>
+                      <dd>
+                        {activeDistance
+                          ? `${Math.round(((activeRetracing ?? 0) / activeDistance) * 100)}%`
+                          : '0%'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Waypoints routed</dt>
+                      <dd>{routeResult.waypointCount}</dd>
+                    </div>
+                  </dl>
+                  <ElevationProfile
+                    key={selectedAlternativeIndex}
+                    elevation={activeElevation}
                   />
-                )}
-                {(activeWarnings?.length ?? 0) > 0 && (
-                  <ul
-                    className="route-result-warnings"
-                    aria-label="Route warnings"
-                  >
-                    {activeWarnings?.map((warning) => (
-                      <li key={warning}>{warning}</li>
-                    ))}
-                  </ul>
+                  {(activeWarnings?.length ?? 0) > 0 && (
+                    <ul
+                      className="route-result-warnings"
+                      aria-label="Route warnings"
+                    >
+                      {activeWarnings?.map((warning) => (
+                        <li key={warning}>{warning}</li>
+                      ))}
+                    </ul>
+                  )}
+                </details>
+                {activeRoute && activeTargetGeometry && (
+                  <details className="route-repair-details">
+                    <summary>Repair part of this route</summary>
+                    <RouteRepairPanel
+                      mode={activeRoute.properties.mode}
+                      route={activeRoute}
+                      targetGeometry={activeTargetGeometry}
+                      onRepaired={handleRouteRepaired}
+                    />
+                  </details>
                 )}
               </section>
             )}

@@ -194,6 +194,34 @@ afterEach(() => {
 });
 
 describe('map workspace with a mocked renderer', () => {
+  it('shows the basic draw controls first and keeps advanced tools collapsed', async () => {
+    render(<MapWorkspace configuration={configuration} />);
+    const map = await mountedMap();
+    act(() => map.emit('load'));
+    enterCoordinates('45.764', '4.8357');
+    fireEvent.click(screen.getByRole('button', { name: 'Draw your idea' }));
+
+    expect(screen.getByLabelText('Activity')).toBeVisible();
+    expect(screen.getByLabelText('Target distance (km)')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Generate street route' }),
+    ).toBeVisible();
+    expect(screen.getByLabelText('Hill preference')).not.toBeVisible();
+    expect(
+      screen.getByText('Route preferences').closest('details'),
+    ).toHaveProperty('open', false);
+    expect(screen.getByText('Move & shape').closest('details')).toHaveProperty(
+      'open',
+      false,
+    );
+    expect(
+      screen.getByText('Import a shape or image').closest('details'),
+    ).toHaveProperty('open', false);
+    expect(
+      screen.getByText('Adjust placement or preview on map').closest('details'),
+    ).toHaveProperty('open', false);
+  });
+
   it('starts in Lyon, exposes attributed loading/ready states, and cleans up', async () => {
     const page = render(<MapWorkspace configuration={configuration} />);
     expect(screen.getByText('Finding your map view…')).toBeInTheDocument();
@@ -244,13 +272,12 @@ describe('map workspace with a mocked renderer', () => {
     enterCoordinates('45.764', '4.8357');
     fireEvent.click(screen.getByRole('button', { name: /Draw your idea/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
-    expect(screen.getByText('Candidate 1 of 12')).toBeVisible();
+    fireEvent.click(screen.getByText('Adjust placement or preview on map'));
+    expect(screen.getByText('Position 1 of 12')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Try another' }));
+    expect(screen.getByText('Position 2 of 12')).toBeVisible();
     fireEvent.click(
-      screen.getByRole('button', { name: 'Try another placement' }),
-    );
-    expect(screen.getByText('Candidate 2 of 12')).toBeVisible();
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Preview target on map' }),
+      screen.getByRole('button', { name: 'Preview placement on map' }),
     );
     expect(screen.getByLabelText('Map geometry legend')).toBeVisible();
     expect(screen.getByText('Target drawing')).toBeVisible();
@@ -402,6 +429,7 @@ describe('map workspace with a mocked renderer', () => {
     enterCoordinates('45.77', '4.84');
     fireEvent.click(screen.getByRole('button', { name: /Draw your idea/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
+    fireEvent.click(screen.getByText('Loop and search area'));
     fireEvent.click(
       screen.getByLabelText('Search for the shape around my chosen area'),
     );
@@ -431,6 +459,14 @@ describe('map workspace with a mocked renderer', () => {
     expect(
       screen.getByRole('status', { name: 'Estimated moving time' }),
     ).toHaveTextContent('18 min');
+    expect(screen.getByText('Route details').closest('details')).toHaveProperty(
+      'open',
+      false,
+    );
+    expect(
+      screen.getByText('Repair part of this route').closest('details'),
+    ).toHaveProperty('open', false);
+    fireEvent.click(screen.getByText('Route details'));
     expect(screen.getByText('82%')).toBeVisible();
     expect(screen.getByText('30 m')).toBeVisible();
     expect(
@@ -459,6 +495,7 @@ describe('map workspace with a mocked renderer', () => {
     expect(
       screen.getByRole('status', { name: 'Estimated moving time' }),
     ).toHaveTextContent('18 min');
+    fireEvent.click(screen.getByText('Repair part of this route'));
     fireEvent.click(screen.getByRole('button', { name: 'Repair a section' }));
     fireEvent.click(
       screen.getByRole('button', { name: 'Reroute selected section' }),
@@ -599,6 +636,7 @@ describe('map workspace with a mocked renderer', () => {
     fireEvent.change(screen.getByLabelText('Activity'), {
       target: { value: 'cycling' },
     });
+    fireEvent.click(screen.getByText('Route preferences'));
     fireEvent.change(screen.getByLabelText('Hill preference'), {
       target: { value: 'flatter' },
     });
@@ -609,7 +647,7 @@ describe('map workspace with a mocked renderer', () => {
       target: { value: 'paved' },
     });
     fireEvent.click(
-      screen.getByLabelText('Find the best shape match (distance can vary)'),
+      screen.getByLabelText('No fixed target distance (best shape match)'),
     );
     expect(screen.queryByLabelText('Target distance (km)')).toBeNull();
     expect(screen.getByText(/cycling may be longer/i)).toBeVisible();
@@ -618,6 +656,7 @@ describe('map workspace with a mocked renderer', () => {
     );
 
     expect(await screen.findByText('7.20 km')).toBeVisible();
+    fireEvent.click(screen.getByText('Route details'));
     expect(screen.getByText('Best shape match')).toBeVisible();
     expect(screen.getByText('cycling')).toBeVisible();
     const payload = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body));
