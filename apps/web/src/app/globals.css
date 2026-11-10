@@ -1349,6 +1349,108 @@ footer p {
   text-transform: capitalize;
   overflow-wrap: anywhere;
 }
+.moving-time-estimate {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #e2e8d9;
+  border-radius: 6px;
+  background: #f7f9f1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  align-items: center;
+}
+.moving-time-estimate-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.moving-time-estimate h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+}
+.moving-time-estimate output {
+  color: #426b4d;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+}
+.moving-time-estimate label {
+  grid-column: 1 / -1;
+  color: #72796e;
+  font-size: 10px;
+}
+.moving-time-estimate input {
+  grid-column: 1;
+  width: min(100%, 180px);
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid #dbe1d3;
+  border-radius: 5px;
+  background: white;
+  color: var(--ink);
+}
+.moving-time-estimate input[aria-invalid='true'] {
+  border-color: #a34a2b;
+}
+.moving-time-estimate p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #72796e;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.route-repair-panel {
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+}
+.route-repair-panel form {
+  display: grid;
+  gap: 9px;
+}
+.route-repair-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.route-repair-panel h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+}
+.route-repair-panel > button {
+  width: 100%;
+}
+.route-repair-panel label:not(.route-repair-via-toggle) {
+  color: #72796e;
+  font-size: 10px;
+}
+.route-repair-panel input[type='range'] {
+  width: 100%;
+  accent-color: #426b4d;
+}
+.route-repair-via-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #72796e;
+  font-size: 11px;
+}
+.route-repair-panel .coordinate-fields {
+  margin: 0;
+}
+.route-repair-panel .coordinate-fields input {
+  width: 100%;
+}
+.route-repair-panel .primary-button {
+  width: 100%;
+  min-height: 38px;
+}
 .route-result-warnings {
   margin: 14px 0 0;
   padding-left: 18px;

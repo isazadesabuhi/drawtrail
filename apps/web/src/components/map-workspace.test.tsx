@@ -345,11 +345,36 @@ describe('map workspace with a mocked renderer', () => {
         'Routed distance differs from the requested distance by more than 20%.',
       ],
     };
+    const repaired = {
+      status: 'success',
+      route: {
+        type: 'Feature',
+        properties: { mode: 'walking' },
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [4.841, 45.771],
+            [4.84105, 45.77115],
+            [4.8411, 45.7711],
+          ],
+        },
+      },
+      distanceMeters: 1600,
+      similarityScore: 0.9,
+      retracingMeters: 10,
+      waypointCount: 19,
+      warnings: [],
+    };
     const fetcher = vi.fn<typeof fetch>(
-      async () =>
-        new Response(JSON.stringify(apiSuccessEnvelope(result)), {
-          status: 200,
-        }),
+      async (input) =>
+        new Response(
+          JSON.stringify(
+            apiSuccessEnvelope(
+              String(input).includes('/repair') ? repaired : result,
+            ),
+          ),
+          { status: 200 },
+        ),
     );
     vi.stubGlobal('fetch', fetcher);
     render(<MapWorkspace configuration={configuration} />);
@@ -384,6 +409,9 @@ describe('map workspace with a mocked renderer', () => {
 
     expect(await screen.findByText('Generated street route')).toBeVisible();
     expect(screen.getByText('1.80 km')).toBeVisible();
+    expect(
+      screen.getByRole('status', { name: 'Estimated moving time' }),
+    ).toHaveTextContent('18 min');
     expect(screen.getByText('82%')).toBeVisible();
     expect(screen.getByText('30 m')).toBeVisible();
     expect(
@@ -391,6 +419,9 @@ describe('map workspace with a mocked renderer', () => {
     ).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /Option 2 · 2.20 km/ }));
     expect(screen.getByText('2.20 km')).toBeVisible();
+    expect(
+      screen.getByRole('status', { name: 'Estimated moving time' }),
+    ).toHaveTextContent('22 min');
     expect(screen.getByText('66%')).toBeVisible();
     expect(
       screen.queryByRole('img', { name: 'Route elevation profile' }),
@@ -406,6 +437,21 @@ describe('map workspace with a mocked renderer', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /Option 1 · 1.80 km/ }));
     expect(screen.getByText('1.80 km')).toBeVisible();
+    expect(
+      screen.getByRole('status', { name: 'Estimated moving time' }),
+    ).toHaveTextContent('18 min');
+    fireEvent.click(screen.getByRole('button', { name: 'Repair a section' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Reroute selected section' }),
+    );
+    await screen.findByRole('button', { name: 'Undo repair' });
+    expect(
+      screen.getByRole('status', { name: 'Estimated moving time' }),
+    ).toHaveTextContent('16 min');
+    fireEvent.click(screen.getByRole('button', { name: 'Undo repair' }));
+    expect(
+      screen.getByRole('status', { name: 'Estimated moving time' }),
+    ).toHaveTextContent('18 min');
     expect(map.fitBounds).toHaveBeenLastCalledWith(
       [
         [4.84, 45.77],

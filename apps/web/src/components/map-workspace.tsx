@@ -13,6 +13,7 @@ import { LYON_CENTER, LYON_ZOOM } from '@drawtrail/geo-utils';
 import {
   lngLatSchema,
   type RouteGenerationSuccess,
+  type RouteRepairSuccess,
 } from '@drawtrail/validation';
 import {
   localGeocoder,
@@ -23,6 +24,8 @@ import type { MapConfiguration } from '../lib/map-config';
 import { MapCanvas, type ViewRequest } from './map-canvas';
 import { DrawingEditor } from './drawing-editor';
 import { ElevationProfile } from './elevation-profile';
+import { MovingTimeEstimate } from './moving-time-estimate';
+import { RouteRepairPanel } from './route-repair-panel';
 
 const EMPTY_FEATURES: GeoJSONFeatureCollection = {
   type: 'FeatureCollection',
@@ -86,6 +89,10 @@ export function MapWorkspace({
     null,
   );
   const [selectedAlternativeIndex, setSelectedAlternativeIndex] = useState(0);
+  const [repairUndo, setRepairUndo] = useState<{
+    result: RouteGenerationSuccess;
+    selectedAlternativeIndex: number;
+  } | null>(null);
   const [searchAreaRadiusMeters, setSearchAreaRadiusMeters] = useState<
     number | null
   >(null);
@@ -113,6 +120,8 @@ export function MapWorkspace({
   const activeAlternative =
     routeResult?.alternatives?.[selectedAlternativeIndex] ?? null;
   const activeRoute = activeAlternative?.route ?? routeResult?.route;
+  const activeTargetGeometry =
+    activeAlternative?.targetGeometry ?? routeResult?.targetGeometry;
   const activeElevation = activeAlternative
     ? activeAlternative.elevation
     : routeResult?.elevation;
@@ -135,6 +144,7 @@ export function MapWorkspace({
     setTargetGeometry(EMPTY_FEATURES);
     setRouteGeometry(EMPTY_FEATURES);
     setRouteResult(null);
+    setRepairUndo(null);
     setStartPoint(point);
     setLatitude(point[1].toFixed(6));
     setLongitude(point[0].toFixed(6));
@@ -197,6 +207,61 @@ export function MapWorkspace({
       features: [alternative.route],
     });
     fitRoute(alternative.route);
+  }
+
+  function handleRouteRepaired(repaired: RouteRepairSuccess) {
+    if (!routeResult || !activeRoute) return;
+    setRepairUndo(
+      (previous) =>
+        previous ?? { result: routeResult, selectedAlternativeIndex },
+    );
+    const updatedMetrics = {
+      route: repaired.route,
+      distanceMeters: repaired.distanceMeters,
+      similarityScore: repaired.similarityScore,
+      retracingMeters: repaired.retracingMeters,
+      waypointCount: repaired.waypointCount,
+      warnings: repaired.warnings,
+      elevation: repaired.elevation,
+    };
+    setRouteResult((previous) => {
+      if (!previous) return previous;
+      const alternatives = previous.alternatives?.map((alternative, index) => {
+        if (index !== selectedAlternativeIndex) return alternative;
+        const distancePenalty = previous.requestedDistanceMeters
+          ? 0.25 *
+            (Math.abs(
+              repaired.distanceMeters - previous.requestedDistanceMeters,
+            ) /
+              previous.requestedDistanceMeters)
+          : 0;
+        const score =
+          repaired.similarityScore -
+          distancePenalty -
+          0.15 *
+            (repaired.distanceMeters > 0
+              ? repaired.retracingMeters / repaired.distanceMeters
+              : 0);
+        return { ...alternative, ...updatedMetrics, score };
+      });
+      return selectedAlternativeIndex === 0 || !alternatives
+        ? { ...previous, ...updatedMetrics, alternatives }
+        : { ...previous, alternatives };
+    });
+    setRouteGeometry({ type: 'FeatureCollection', features: [repaired.route] });
+    fitRoute(repaired.route);
+  }
+
+  function undoRouteRepair() {
+    if (!repairUndo) return;
+    const { result, selectedAlternativeIndex: previousIndex } = repairUndo;
+    const alternative = result.alternatives?.[previousIndex];
+    const previousRoute = alternative?.route ?? result.route;
+    setRouteResult(result);
+    setSelectedAlternativeIndex(previousIndex);
+    setRouteGeometry({ type: 'FeatureCollection', features: [previousRoute] });
+    setRepairUndo(null);
+    fitRoute(previousRoute);
   }
 
   function applyCoordinates(event: FormEvent<HTMLFormElement>) {
@@ -435,6 +500,7 @@ export function MapWorkspace({
                       setTargetGeometry(EMPTY_FEATURES);
                       setRouteGeometry(EMPTY_FEATURES);
                       setRouteResult(null);
+                      setRepairUndo(null);
                       setLatitude('');
                       setLongitude('');
                       setSelectionError('');
@@ -528,6 +594,15 @@ export function MapWorkspace({
                   >
                     Clear route
                   </button>
+                  {repairUndo && (
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={undoRouteRepair}
+                    >
+                      Undo repair
+                    </button>
+                  )}
                 </div>
                 {(routeResult.alternatives?.length ?? 0) > 1 && (
                   <div
@@ -596,6 +671,18 @@ export function MapWorkspace({
                   key={selectedAlternativeIndex}
                   elevation={activeElevation}
                 />
+                <MovingTimeEstimate
+                  mode={activeRoute?.properties.mode ?? 'walking'}
+                  distanceMeters={activeDistance ?? 0}
+                />
+                {activeRoute && activeTargetGeometry && (
+                  <RouteRepairPanel
+                    mode={activeRoute.properties.mode}
+                    route={activeRoute}
+                    targetGeometry={activeTargetGeometry}
+                    onRepaired={handleRouteRepaired}
+                  />
+                )}
                 {(activeWarnings?.length ?? 0) > 0 && (
                   <ul
                     className="route-result-warnings"
@@ -661,10 +748,12 @@ export function MapWorkspace({
               setTargetGeometry(geometry);
               setRouteGeometry(EMPTY_FEATURES);
               setRouteResult(null);
+              setRepairUndo(null);
               setStage('place');
             }}
             onGenerated={(result) => {
               setRouteResult(result);
+              setRepairUndo(null);
               setSelectedAlternativeIndex(0);
               setTargetGeometry({
                 type: 'FeatureCollection',

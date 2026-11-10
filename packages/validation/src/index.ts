@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { routeElevationSchema } from './elevation';
 export * from './elevation';
+export * from './route-repair';
 
 export const activityModeSchema = z.enum(['walking', 'running', 'cycling']);
 export const routePreferencesSchema = z
