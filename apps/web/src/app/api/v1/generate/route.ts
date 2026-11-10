@@ -104,6 +104,7 @@ export async function POST(request: Request) {
               ),
             );
           },
+          client.elevation.bind(client),
         )
           .then((response) => {
             const validated = routeGenerationResponseSchema.parse(response);
@@ -156,6 +157,8 @@ export async function POST(request: Request) {
         ...(preferences ? { preferences } : {}),
       }),
     request.signal,
+    undefined,
+    client.elevation.bind(client),
   );
   const validated = routeGenerationResponseSchema.parse(response);
   const envelope =

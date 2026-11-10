@@ -1,5 +1,11 @@
 # Initial route-quality metrics
 
+## Elevation estimates
+
+Elevation is optional metadata from Valhalla's digital terrain dataset, fetched only for shortlisted street routes. For a complete sampled profile, ascent is `sum(max(0, next_height - height))` and descent is `sum(max(0, height - next_height))`, in metres. These are unsmoothed terrain estimates at roughly 30 m spacing (capped at 1024 samples); noise and sampling density can change totals and small climbs may be missed. Missing heights stay null: partial coverage displays chart gaps and no full-route totals. A fully missing profile is unavailable, while genuine zero-metre elevations remain valid. Elevation does not alter the shape-ranking score. Tests cover known climb/descent totals, negative/zero heights, gaps, malformed data, and alternative selection.
+
+## Route matching
+
 These are configurable engineering targets, not demonstrated performance. Only router-validated, contiguous network geometry can be eligible for export. Quality scores cannot override access or continuity failures.
 
 All comparisons use a suitable local metric projection; API coordinates use WGS84 `[longitude, latitude]`. Fix drawing fixtures, OSM extract checksum, engine/configuration, and seed in algorithm tests.

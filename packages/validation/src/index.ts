@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { routeElevationSchema } from './elevation';
+export * from './elevation';
 
 export const activityModeSchema = z.enum(['walking', 'running', 'cycling']);
 export const routePreferencesSchema = z
@@ -210,6 +212,7 @@ const routeGenerationErrorCodeSchema = z.enum([
 const routeGenerationAlternativeSchema = z
   .object({
     id: z.string().min(1).max(80),
+    elevation: routeElevationSchema.optional(),
     targetGeometry: z
       .object({
         type: z.literal('LineString'),
@@ -240,6 +243,7 @@ const routeGenerationAlternativeSchema = z
 export const routeGenerationSuccessSchema = z
   .object({
     status: z.literal('success'),
+    elevation: routeElevationSchema.optional(),
     targetGeometry: z
       .object({
         type: z.literal('LineString'),

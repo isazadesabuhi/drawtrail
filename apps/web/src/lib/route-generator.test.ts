@@ -8,6 +8,8 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 import { generateRoute, type RouteSegmenter } from './route-generator';
 import { ValhallaError } from './valhalla-client';
+import { summarizeElevation } from './elevation';
+import { addRouteElevation, type ElevationLookup } from './route-elevation';
 
 const anchor: LngLat = [1.5218, 42.5063];
 
@@ -36,6 +38,63 @@ function fixtureRouter(): RouteSegmenter {
 }
 
 describe('route generator', () => {
+  it.each(['fixed', 'area', 'best-shape'] as const)(
+    'enriches only the returned alternatives with elevation in %s search',
+    async (search) => {
+      const request = await readRequest();
+      request.bounds.radiusMeters = 25_000;
+      if (search === 'area')
+        request.settings.searchArea = { radiusMeters: 1000, candidateCount: 4 };
+      if (search === 'best-shape') delete request.targetDistanceKm;
+      const elevation = vi.fn<ElevationLookup>(async (_coordinates, distance) =>
+        summarizeElevation([0, distance], [100, 120]),
+      );
+      const result = await generateRoute(
+        request,
+        fixtureRouter(),
+        undefined,
+        undefined,
+        elevation,
+      );
+      expect(result.status).toBe('success');
+      if (result.status !== 'success') return;
+      expect(elevation).toHaveBeenCalledTimes(result.alternatives?.length ?? 1);
+      expect(result.elevation).toMatchObject({
+        status: 'complete',
+        ascentMeters: 20,
+      });
+      for (const candidate of result.alternatives ?? [result]) {
+        expect(candidate.elevation?.status).toBe('complete');
+        if (candidate.elevation?.status === 'complete')
+          expect(candidate.elevation.samples.at(-1)?.distanceMeters).toBe(
+            candidate.distanceMeters,
+          );
+      }
+      expect(elevation.mock.calls.length).toBeLessThanOrEqual(3);
+    },
+  );
+
+  it('preserves a street route when terrain is unavailable and cancels enrichment cooperatively', async () => {
+    const request = await readRequest();
+    const route = await generateRoute(request, fixtureRouter());
+    const missing = await addRouteElevation(route, async () => {
+      throw new Error('offline');
+    });
+    expect(missing.status).toBe('success');
+    if (missing.status === 'success')
+      expect(missing.elevation).toMatchObject({ status: 'unavailable' });
+    const controller = new AbortController();
+    const cancelled = await addRouteElevation(
+      route,
+      async (_coords, distance) => {
+        controller.abort();
+        return summarizeElevation([0, distance], [100, 100]);
+      },
+      controller.signal,
+    );
+    expect(cancelled).toMatchObject({ status: 'error', code: 'cancelled' });
+  });
+
   it('routes a heart fixture in ordered segments and reports routed metrics', async () => {
     const request = await readRequest();
     const router = vi.fn(fixtureRouter());

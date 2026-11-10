@@ -54,9 +54,17 @@ describe('POST /api/v1/generate progress streaming', () => {
           geometry: { type: 'LineString', coordinates: [from, to] },
           distanceMeters: 1250,
         });
+      const elevation = vi
+        .spyOn(ValhallaClient.prototype, 'elevation')
+        .mockResolvedValue({
+          status: 'unavailable',
+          source: 'valhalla',
+          reason: 'missing_data',
+        });
       vi.mocked(generateRoute).mockImplementation(
-        async (body, router, signal) => {
+        async (body, router, signal, _progress, lookup) => {
           await router(body.mode, from, to, signal, body.settings.preferences);
+          await lookup?.([from, to], 1250, signal);
           return result;
         },
       );
@@ -68,6 +76,11 @@ describe('POST /api/v1/generate progress streaming', () => {
         }),
       );
       await response.text();
+      expect(elevation).toHaveBeenCalledWith(
+        [from, to],
+        1250,
+        expect.any(AbortSignal),
+      );
       expect(route).toHaveBeenCalledWith(
         'cycling',
         from,

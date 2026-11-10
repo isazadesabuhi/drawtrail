@@ -74,6 +74,7 @@ const worker = new Worker(
                   }),
                 signal,
                 onProgress,
+                router.elevation.bind(router),
               ),
             ),
           complete: completeGeneration,

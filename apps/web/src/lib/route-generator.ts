@@ -18,6 +18,7 @@ import type {
   RouteGenerationSuccess,
 } from '@drawtrail/validation';
 import { ValhallaError, type ValhallaRoute } from './valhalla-client';
+import { addRouteElevation, type ElevationLookup } from './route-elevation';
 
 export type RouteSegmenter = (
   mode: RouteGenerationRequest['mode'],
@@ -363,11 +364,16 @@ export async function generateRoute(
     completed: number;
     total: number;
   }) => void,
+  elevationLookup?: ElevationLookup,
 ): Promise<RouteGenerationResponse> {
   const searchArea = request.settings.searchArea;
   const unconstrainedDistance = request.targetDistanceKm === undefined;
   if (!searchArea && !unconstrainedDistance)
-    return generateSingleRoute(request, routeSegment, signal);
+    return addRouteElevation(
+      await generateSingleRoute(request, routeSegment, signal),
+      elevationLookup,
+      signal,
+    );
 
   const candidateCount = searchArea?.candidateCount ?? 6;
   const searchRadiusMeters = searchArea?.radiusMeters ?? 0;
@@ -548,11 +554,15 @@ export async function generateRoute(
         : `Best shape match of ${ranked.length} viable route sizes at the selected map pin.`,
     ];
     if (budgetMessage) warnings.push(budgetMessage);
-    return {
-      ...ranked.find((item) => item.result.route === best.route)!.result,
-      warnings,
-      alternatives,
-    };
+    return addRouteElevation(
+      {
+        ...ranked.find((item) => item.result.route === best.route)!.result,
+        warnings,
+        alternatives,
+      },
+      elevationLookup,
+      signal,
+    );
   }
   return failure(
     budgetMessage ? 'optimization_budget' : (lastFailure?.code ?? 'no_route'),

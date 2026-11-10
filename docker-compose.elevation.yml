@@ -1,0 +1,6 @@
+# Use together with docker-compose.yml. Reuses the existing regional graph volume.
+services:
+  valhalla:
+    environment:
+      build_elevation: 'True'
+      force_rebuild: ${VALHALLA_FORCE_REBUILD:-False}

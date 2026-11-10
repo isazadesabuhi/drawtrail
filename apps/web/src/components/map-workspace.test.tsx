@@ -14,6 +14,7 @@ import { apiSuccessEnvelope } from '@drawtrail/api-client';
 import type { Geocoder } from '../lib/geocoding';
 import type { MapConfiguration } from '../lib/map-config';
 import { MapWorkspace } from './map-workspace';
+import { summarizeElevation } from '../lib/elevation';
 
 type Point = [number, number];
 type EventData = { lngLat: { lng: number; lat: number } };
@@ -254,6 +255,7 @@ describe('map workspace with a mocked renderer', () => {
   it('posts one selected stroke and displays the generated route and measured metrics', async () => {
     const result = {
       status: 'success',
+      elevation: summarizeElevation([0, 900, 1800], [100, 130, 110]),
       targetGeometry: {
         type: 'LineString',
         coordinates: [
@@ -281,6 +283,7 @@ describe('map workspace with a mocked renderer', () => {
       alternatives: [
         {
           id: 'route-1',
+          elevation: summarizeElevation([0, 900, 1800], [100, 130, 110]),
           targetGeometry: {
             type: 'LineString',
             coordinates: [
@@ -382,9 +385,17 @@ describe('map workspace with a mocked renderer', () => {
     expect(await screen.findByText('Generated street route')).toBeVisible();
     expect(screen.getByText('1.80 km')).toBeVisible();
     expect(screen.getByText('82%')).toBeVisible();
+    expect(screen.getByText('30 m')).toBeVisible();
+    expect(
+      screen.getByRole('img', { name: 'Route elevation profile' }),
+    ).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /Option 2 · 2.20 km/ }));
     expect(screen.getByText('2.20 km')).toBeVisible();
     expect(screen.getByText('66%')).toBeVisible();
+    expect(
+      screen.queryByRole('img', { name: 'Route elevation profile' }),
+    ).toBeNull();
+    expect(screen.getByText(/Ascent and descent are unknown/)).toBeVisible();
     expect(screen.getByText('9%')).toBeVisible();
     expect(map.fitBounds).toHaveBeenLastCalledWith(
       [
@@ -405,6 +416,9 @@ describe('map workspace with a mocked renderer', () => {
     expect(screen.getByLabelText('Map geometry legend')).toHaveTextContent(
       'Actual street route (generated)',
     );
+    expect(
+      screen.getByRole('img', { name: 'Route elevation profile' }),
+    ).toBeVisible();
     const request = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body));
     expect(request).toMatchObject({
       center: [4.84, 45.77],

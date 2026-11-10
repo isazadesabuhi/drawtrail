@@ -22,6 +22,7 @@ import {
 import type { MapConfiguration } from '../lib/map-config';
 import { MapCanvas, type ViewRequest } from './map-canvas';
 import { DrawingEditor } from './drawing-editor';
+import { ElevationProfile } from './elevation-profile';
 
 const EMPTY_FEATURES: GeoJSONFeatureCollection = {
   type: 'FeatureCollection',
@@ -112,6 +113,9 @@ export function MapWorkspace({
   const activeAlternative =
     routeResult?.alternatives?.[selectedAlternativeIndex] ?? null;
   const activeRoute = activeAlternative?.route ?? routeResult?.route;
+  const activeElevation = activeAlternative
+    ? activeAlternative.elevation
+    : routeResult?.elevation;
   const activeDistance =
     activeAlternative?.distanceMeters ?? routeResult?.distanceMeters;
   const activeSimilarity =
@@ -588,6 +592,10 @@ export function MapWorkspace({
                     <dd>{routeResult.waypointCount}</dd>
                   </div>
                 </dl>
+                <ElevationProfile
+                  key={selectedAlternativeIndex}
+                  elevation={activeElevation}
+                />
                 {(activeWarnings?.length ?? 0) > 0 && (
                   <ul
                     className="route-result-warnings"

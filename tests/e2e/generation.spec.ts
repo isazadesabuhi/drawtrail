@@ -16,6 +16,18 @@ test('generates a routed baseline and shows route metrics and warnings', async (
         status: 'success',
         error: null,
         data: {
+          status: 'success',
+          elevation: {
+            status: 'complete',
+            source: 'valhalla',
+            ascentMeters: 30,
+            descentMeters: 20,
+            samples: [
+              { distanceMeters: 0, elevationMeters: 200 },
+              { distanceMeters: 900, elevationMeters: 230 },
+              { distanceMeters: 1800, elevationMeters: 210 },
+            ],
+          },
           targetGeometry: {
             type: 'LineString',
             coordinates: [
@@ -77,8 +89,25 @@ test('generates a routed baseline and shows route metrics and warnings', async (
   await expect(
     page.getByRole('region', { name: 'Generated route results' }),
   ).toBeVisible();
-  await expect(page.getByText('1.80 km')).toBeVisible();
+  await expect(page.getByText('1.80 km', { exact: true })).toBeVisible();
   await expect(page.getByText('82%')).toBeVisible();
+  await expect(
+    page.getByRole('img', { name: 'Route elevation profile' }),
+  ).toBeVisible();
+  await expect(page.getByText('30 m', { exact: true })).toBeVisible();
+  await page
+    .getByRole('slider', { name: 'Inspect elevation along the route' })
+    .focus();
+  await page.keyboard.press('End');
+  await expect(page.getByText('1.80 km · 210 m elevation')).toBeVisible();
+  await page
+    .getByRole('region', { name: 'Route elevation', exact: true })
+    .screenshot({ path: test.info().outputPath('elevation.png') });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
   await expect(
     page.getByRole('list', { name: 'Route warnings' }),
   ).toContainText(

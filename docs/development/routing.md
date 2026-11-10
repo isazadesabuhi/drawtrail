@@ -51,7 +51,32 @@ Generation requests optionally include `settings.preferences` with `hills` (`fla
 
 Hill choices map to Valhalla `use_hills` values 0, 0.5, and 1 for both pedestrian and bicycle costing. “Hills are okay” removes hill-avoidance pressure; it does not actively seek climbs. Cycling road comfort maps to `use_roads` 0, 0.25, and 0.8. Surface suitability chooses road, hybrid, or mountain bicycle costing, with `avoid_bad_surfaces` 0.9, 0.2, or 0 respectively. These are preferences rather than hard surface guarantees; rough/gravel suitability permits those surfaces rather than requiring dirt. Walking and running do not receive bicycle options. See the [Valhalla costing reference](https://valhalla.github.io/valhalla/api/route/api-reference/) for the underlying options.
 
-The local Compose service currently uses `build_elevation: 'False'`. Hill preferences require elevation information in the routing graph to have a meaningful effect. Elevation profiles, ascent/descent, and coverage reporting remain task 14-05; they must distinguish missing elevation from genuinely flat terrain. Enabling elevation requires preparing elevation data and rebuilding the graph, which is a separate setup step. No elevation data is downloaded or graph volume replaced by the preference controls.
+Hill preferences require elevation information in the routing graph to have a meaningful effect. Profiles use the elevation dataset through Valhalla's `/height` endpoint. The base Compose file keeps the lightweight setup; the elevation override enables terrain data for both the graph and elevation lookups.
+
+## Enable elevation
+
+Start Docker Desktop, then run:
+
+```sh
+pnpm routing:elevation:up
+pnpm routing:elevation:health
+```
+
+The override enables `build_elevation=True` on the pinned Valhalla image and reuses the current region and named volume. On a first build, the image may create the routing graph before the elevation tiles finish downloading. If so, run the one-time forced rebuild below so the graph itself includes elevation. Expect additional download, disk use and build time. Follow progress with `docker compose logs -f valhalla`; the health command waits up to 15 minutes while the service starts and can be rerun if the build takes longer. Use `routing:elevation:up` for subsequent starts with elevation support and `routing:down` to stop it.
+
+If the route API responds but the elevation health check says the graph has no usable elevation (for example, the elevation tiles downloaded after the initial graph build), force a one-time rebuild using PowerShell:
+
+```powershell
+$env:VALHALLA_FORCE_REBUILD = 'True'
+pnpm routing:elevation:up
+pnpm routing:elevation:health
+Remove-Item Env:VALHALLA_FORCE_REBUILD
+pnpm routing:elevation:up
+```
+
+The final command removes the force-rebuild setting from the service for future starts. This rebuild uses the existing PBF and volume; there is no need to delete the volume. The health check verifies a supported Lyon/Andorra route's embedded graph elevations and the separate `/height` lookup. Other regions require corresponding fixture coordinates. Source behavior is documented in the [Valhalla 3.9.1 Docker guide](https://github.com/valhalla/valhalla/blob/3.9.1/docker/README.md).
+
+Generate a new route after the elevation health check passes. Selecting an alternative updates the profile; the profile slider supports keyboard inspection. Old saved results without elevation remain readable and show unavailable elevation until regenerated. A height dataset alone can provide a profile, but hill preferences also need the graph rebuild. Terrain elevations may differ from bridge/tunnel deck heights. Data credits are linked from the profile to the [Valhalla elevation data credits](https://valhalla.github.io/valhalla/api/elevation/#data-credits).
 
 ## Tests
 

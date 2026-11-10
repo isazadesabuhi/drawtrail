@@ -1,6 +1,11 @@
 import type { ActivityMode, LngLat } from '@drawtrail/types';
-import { lngLatSchema, type RoutePreferences } from '@drawtrail/validation';
+import {
+  lngLatSchema,
+  type RoutePreferences,
+  type RouteElevation,
+} from '@drawtrail/validation';
 import { z } from 'zod';
+import { sampleElevationLocations, summarizeElevation } from './elevation';
 
 if (typeof window !== 'undefined') {
   throw new Error(
@@ -203,6 +208,80 @@ export class ValhallaClient {
       !Number.isInteger(this.retries)
     ) {
       throw new RangeError('Valhalla retries must be an integer from 0 to 3.');
+    }
+  }
+
+  /** Optional terrain metadata: one bounded request, independent of route validity. */
+  async elevation(
+    coordinates: readonly LngLat[],
+    distanceMeters: number,
+    signal?: AbortSignal,
+  ): Promise<RouteElevation> {
+    if (signal?.aborted)
+      throw new ValhallaError('cancelled', 'Elevation lookup was cancelled.');
+    let locations: ReturnType<typeof sampleElevationLocations>;
+    try {
+      locations = sampleElevationLocations(coordinates, distanceMeters);
+    } catch {
+      return {
+        status: 'unavailable',
+        source: 'valhalla',
+        reason: 'invalid_response',
+      };
+    }
+    const controller = new AbortController();
+    const onAbort = () => controller.abort(signal?.reason);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    const timer = setTimeout(
+      () => controller.abort(),
+      Math.min(this.timeoutMs, 2500),
+    );
+    try {
+      const response = await this.fetcher(new URL('/height', this.baseUrl), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          shape: locations.map(({ coordinate: [lon, lat] }) => ({ lon, lat })),
+          range: false,
+          height_precision: 1,
+        }),
+        signal: controller.signal,
+      });
+      if (signal?.aborted)
+        throw new ValhallaError('cancelled', 'Elevation lookup was cancelled.');
+      if (!response.ok)
+        return {
+          status: 'unavailable',
+          source: 'valhalla',
+          reason: 'service_unavailable',
+        };
+      const parsed = z
+        .object({ height: z.array(z.number().finite().nullable()).max(1024) })
+        .safeParse(await response.json());
+      if (!parsed.success)
+        return {
+          status: 'unavailable',
+          source: 'valhalla',
+          reason: 'invalid_response',
+        };
+      return summarizeElevation(
+        locations.map((point) => point.distanceMeters),
+        parsed.data.height,
+      );
+    } catch (error) {
+      if (signal?.aborted)
+        throw new ValhallaError('cancelled', 'Elevation lookup was cancelled.');
+      return {
+        status: 'unavailable',
+        source: 'valhalla',
+        reason:
+          error instanceof SyntaxError
+            ? 'invalid_response'
+            : 'service_unavailable',
+      };
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
     }
   }
 

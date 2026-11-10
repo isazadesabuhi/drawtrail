@@ -1856,3 +1856,43 @@ footer p {
     transition: none !important;
   }
 }
+
+.elevation-profile {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #ddd;
+}
+.elevation-profile h3 {
+  margin: 0 0 12px;
+}
+.elevation-profile svg {
+  display: block;
+  width: 100%;
+  max-width: 700px;
+  height: auto;
+}
+.elevation-profile svg text {
+  font-size: 12px;
+  fill: currentColor;
+}
+.elevation-profile input[type='range'] {
+  width: 100%;
+  display: block;
+  margin: 12px 0;
+  accent-color: #257453;
+}
+.elevation-profile output {
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+.elevation-line {
+  fill: none;
+  stroke: #257453;
+  stroke-width: 2;
+}
+.elevation-point {
+  fill: #257453;
+}
+.elevation-axis {
+  stroke: #bbb;
+}

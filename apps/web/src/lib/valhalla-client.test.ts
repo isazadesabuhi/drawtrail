@@ -23,6 +23,84 @@ const success = () =>
   );
 
 describe('Valhalla client', () => {
+  it.each([
+    { height: [100, 120], status: 'complete' },
+    { height: [100, null], status: 'partial' },
+    { height: [null, null], status: 'unavailable' },
+    { height: [100], status: 'unavailable' },
+  ])(
+    'reads bounded elevation data with $status coverage ($height)',
+    async ({ height, status }) => {
+      const fetcher = vi.fn<typeof fetch>(async () =>
+        Response.json({ height }),
+      );
+      const client = new ValhallaClient({
+        baseUrl: 'http://localhost:8002',
+        fetch: fetcher,
+      });
+      const profile = await client.elevation(
+        [
+          [1.5, 42],
+          [1.50001, 42.00001],
+        ],
+        1250,
+      );
+      expect(profile.status).toBe(status);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(new URL(String(fetcher.mock.calls[0]![0])).pathname).toBe(
+        '/height',
+      );
+      expect(JSON.parse(String(fetcher.mock.calls[0]![1]?.body))).toMatchObject(
+        {
+          shape: [
+            { lon: 1.5, lat: 42 },
+            { lon: 1.50001, lat: 42.00001 },
+          ],
+          range: false,
+          height_precision: 1,
+        },
+      );
+      if (profile.status === 'complete') expect(profile.ascentMeters).toBe(20);
+    },
+  );
+
+  it('keeps elevation service failures optional but respects user cancellation', async () => {
+    const fetcher: typeof fetch = (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () =>
+          reject(new DOMException('Aborted', 'AbortError')),
+        );
+      });
+    const client = new ValhallaClient({
+      baseUrl: 'http://localhost:8002',
+      timeoutMs: 10,
+      fetch: fetcher,
+    });
+    await expect(
+      client.elevation(
+        [
+          [1.5, 42],
+          [1.50001, 42.00001],
+        ],
+        1250,
+      ),
+    ).resolves.toMatchObject({
+      status: 'unavailable',
+      reason: 'service_unavailable',
+    });
+    const controller = new AbortController();
+    const pending = client.elevation(
+      [
+        [1.5, 42],
+        [1.50001, 42.00001],
+      ],
+      1250,
+      controller.signal,
+    );
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ code: 'cancelled' });
+  });
+
   it('decodes a fixed precision-six shape and kilometers to meters', async () => {
     const fetcher = vi.fn<typeof fetch>(async () => success());
     const client = new ValhallaClient({

@@ -26,6 +26,8 @@
     "routing:up": "docker compose up -d valhalla",
     "routing:down": "docker compose stop valhalla",
     "routing:health": "node tools/check-valhalla.mjs --wait",
+    "routing:elevation:up": "docker compose -f docker-compose.yml -f docker-compose.elevation.yml up -d valhalla",
+    "routing:elevation:health": "node tools/check-valhalla.mjs --elevation --wait",
     "test:routing:integration": "node tools/test-routing-integration.mjs",
     "test:generation:integration": "node tools/test-generation-integration.mjs",
     "test:generation:jobs:integration": "node tools/test-generation-jobs-integration.mjs",
