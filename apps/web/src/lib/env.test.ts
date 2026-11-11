@@ -6,6 +6,7 @@ describe('server environment', () => {
     expect(readServerConfig({})).toEqual({
       VALHALLA_URL: undefined,
       VALHALLA_API_KEY: undefined,
+      VALHALLA_CLIENT_ID: undefined,
     });
   });
   it('explains missing routing configuration when requested', () => {
@@ -34,6 +35,12 @@ describe('server environment', () => {
   });
   it('rejects short routing service keys', () => {
     expect(() => readServerConfig({ VALHALLA_API_KEY: 'too-short' })).toThrow();
+  });
+  it('accepts a Valhalla client identifier', () => {
+    expect(
+      readServerConfig({ VALHALLA_CLIENT_ID: 'drawtrail.vercel.app' })
+        .VALHALLA_CLIENT_ID,
+    ).toBe('drawtrail.vercel.app');
   });
   it.each(['file:///private/router', 'ftp://router.example.test', ''])(
     'rejects an unsupported router URL',

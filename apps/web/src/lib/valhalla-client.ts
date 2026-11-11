@@ -43,6 +43,7 @@ export interface ValhallaRoute {
 export interface ValhallaClientOptions {
   baseUrl: string | URL;
   apiKey?: string;
+  clientId?: string;
   timeoutMs?: number;
   retries?: number;
   fetch?: typeof fetch;
@@ -198,6 +199,7 @@ export class ValhallaClient {
   private readonly retries: number;
   private readonly fetcher: typeof fetch;
   private readonly apiKey: string | undefined;
+  private readonly clientId: string | undefined;
 
   constructor(options: ValhallaClientOptions) {
     this.baseUrl = new URL(options.baseUrl);
@@ -205,6 +207,7 @@ export class ValhallaClient {
     this.retries = options.retries ?? 1;
     this.fetcher = options.fetch ?? fetch;
     this.apiKey = options.apiKey?.trim() || undefined;
+    this.clientId = options.clientId?.trim() || undefined;
     if (
       this.retries < 0 ||
       this.retries > 3 ||
@@ -212,6 +215,14 @@ export class ValhallaClient {
     ) {
       throw new RangeError('Valhalla retries must be an integer from 0 to 3.');
     }
+  }
+
+  private requestHeaders(extra?: Record<string, string>) {
+    return {
+      ...extra,
+      ...(this.apiKey ? { 'x-drawtrail-routing-key': this.apiKey } : {}),
+      ...(this.clientId ? { 'x-client-id': this.clientId } : {}),
+    };
   }
 
   /** Optional terrain metadata: one bounded request, independent of route validity. */
@@ -242,10 +253,7 @@ export class ValhallaClient {
     try {
       const response = await this.fetcher(new URL('/height', this.baseUrl), {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          ...(this.apiKey ? { 'x-drawtrail-routing-key': this.apiKey } : {}),
-        },
+        headers: this.requestHeaders({ 'content-type': 'application/json' }),
         body: JSON.stringify({
           shape: locations.map(({ coordinate: [lon, lat] }) => ({ lon, lat })),
           range: false,
@@ -415,9 +423,7 @@ export class ValhallaClient {
       }, this.timeoutMs);
       try {
         const response = await this.fetcher(url, {
-          ...(this.apiKey
-            ? { headers: { 'x-drawtrail-routing-key': this.apiKey } }
-            : {}),
+          headers: this.requestHeaders(),
           signal: controller.signal,
         });
         const body: unknown = await response.json().catch(() => null);

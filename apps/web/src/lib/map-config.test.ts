@@ -30,6 +30,16 @@ describe('map provider configuration', () => {
       ).toEqual({ mode: 'configured', style, attribution: 'Local provider' });
     },
   );
+  it('identifies MapTiler styles so its logo and linked attribution can be shown', () => {
+    expect(
+      getMapConfiguration({
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_MAP_STYLE_URL:
+          'https://api.maptiler.com/maps/streets-v4/style.json?key=public-key',
+        NEXT_PUBLIC_MAP_ATTRIBUTION: 'MapTiler OpenStreetMap contributors',
+      }),
+    ).toMatchObject({ mode: 'configured', providerLogo: 'maptiler' });
+  });
   it.each([
     'javascript:alert(1)',
     'file:///secret',

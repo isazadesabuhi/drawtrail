@@ -3,6 +3,7 @@ import { z } from 'zod';
 const environmentSchema = z.object({
   VALHALLA_URL: z.url({ protocol: /^https?$/ }).optional(),
   VALHALLA_API_KEY: z.string().min(32).optional(),
+  VALHALLA_CLIENT_ID: z.string().trim().min(1).max(120).optional(),
 });
 
 /**
@@ -15,6 +16,7 @@ export function readServerConfig(environment, requireRouter = false) {
   const result = environmentSchema.safeParse({
     VALHALLA_URL: environment.VALHALLA_URL,
     VALHALLA_API_KEY: environment.VALHALLA_API_KEY,
+    VALHALLA_CLIENT_ID: environment.VALHALLA_CLIENT_ID,
   });
   if (!result.success)
     throw new Error('Invalid VALHALLA_URL: expected an HTTP(S) URL.');

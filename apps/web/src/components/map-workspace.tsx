@@ -333,7 +333,7 @@ export function MapWorkspace({
           </h1>
           <p>
             {stage === 'place'
-              ? 'Choose a start point. Routes work only where street data is loaded; this local setup covers Rhône-Alpes.'
+              ? 'Choose a start point. Routes work only where the selected routing service has street data.'
               : 'Draw a shape or choose a preset. You can generate a route without previewing first.'}
           </p>
         </div>
@@ -749,10 +749,47 @@ export function MapWorkspace({
                   >
                     © OpenStreetMap contributors
                   </a>
+                ) : configuration.mode === 'configured' &&
+                  configuration.providerLogo === 'maptiler' ? (
+                  <>
+                    <a
+                      href="https://www.maptiler.com/copyright/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      &copy; MapTiler
+                    </a>{' '}
+                    <a
+                      href="https://www.openstreetmap.org/copyright"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      &copy; OpenStreetMap contributors
+                    </a>
+                  </>
                 ) : (
                   configuration.attribution
                 )}
               </span>
+              {configuration.mode === 'configured' &&
+                configuration.providerLogo === 'maptiler' && (
+                  <a
+                    className="map-provider-logo"
+                    href="https://www.maptiler.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="MapTiler"
+                  >
+                    {/* MapTiler documents this public logo asset for free-plan attribution. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="https://api.maptiler.com/resources/logo.svg"
+                      alt="MapTiler"
+                      width="86"
+                      height="24"
+                    />
+                  </a>
+                )}
               <a
                 href="https://maplibre.org/"
                 target="_blank"
@@ -764,8 +801,8 @@ export function MapWorkspace({
             <div className="map-bottom-note">
               <span aria-hidden="true">✳</span>
               <p>
-                Choose a place, draw one stroke, then generate a route using the
-                local walking or bicycle street network.
+                Choose a place, draw one stroke, then generate a route using
+                available walking or bicycle street data.
               </p>
               <a
                 href="https://www.openstreetmap.org/fixthemap"

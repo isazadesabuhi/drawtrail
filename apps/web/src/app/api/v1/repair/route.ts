@@ -50,6 +50,9 @@ export async function POST(request: Request) {
   const client = new ValhallaClient({
     baseUrl: config.VALHALLA_URL ?? 'http://127.0.0.1:8002',
     ...(config.VALHALLA_API_KEY ? { apiKey: config.VALHALLA_API_KEY } : {}),
+    ...(config.VALHALLA_CLIENT_ID
+      ? { clientId: config.VALHALLA_CLIENT_ID }
+      : {}),
     timeoutMs: 12_000,
     retries: 1,
   });

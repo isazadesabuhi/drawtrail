@@ -34,9 +34,10 @@ The first graph and elevation build downloads OSM and terrain data and can take 
    ```text
    VALHALLA_URL=https://routing.example.com
    VALHALLA_API_KEY=<the same random secret from the VPS .env>
+   VALHALLA_CLIENT_ID=drawtrail.vercel.app
    ```
 
-   Replace the example hostname with your actual routing hostname in both examples. Redeploy DrawTrail after saving. The key is server-only; do not prefix it with `NEXT_PUBLIC_`.
+   Replace the example hostname with your actual routing hostname in both examples. Redeploy DrawTrail after saving. The key is server-only; do not prefix it with `NEXT_PUBLIC_`. `VALHALLA_CLIENT_ID` is optional for a self-hosted service.
 
 ## Maintenance
 

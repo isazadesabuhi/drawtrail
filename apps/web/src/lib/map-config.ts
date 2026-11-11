@@ -5,6 +5,7 @@ export type MapConfiguration =
       mode: 'development' | 'configured';
       style: StyleSpecification | string;
       attribution: string;
+      providerLogo?: 'maptiler';
     }
   | { mode: 'unconfigured'; attribution: string };
 
@@ -24,14 +25,38 @@ function isStyleUrl(value: string): boolean {
   }
 }
 
+function providerLogoForStyle(style: string): 'maptiler' | undefined {
+  try {
+    const hostname = new URL(style).hostname.toLowerCase();
+    if (
+      hostname === 'api.maptiler.com' ||
+      hostname.endsWith('.maptiler.com') ||
+      hostname === 'api.maptiler.eu' ||
+      hostname.endsWith('.maptiler.eu')
+    ) {
+      return 'maptiler';
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
 export function getMapConfiguration(
   environment: MapEnvironment,
 ): MapConfiguration {
   const style = environment.NEXT_PUBLIC_MAP_STYLE_URL?.trim();
   const attribution = environment.NEXT_PUBLIC_MAP_ATTRIBUTION?.trim();
   if (style || attribution) {
-    if (style && attribution && isStyleUrl(style))
-      return { mode: 'configured', style, attribution };
+    if (style && attribution && isStyleUrl(style)) {
+      const providerLogo = providerLogoForStyle(style);
+      return {
+        mode: 'configured',
+        style,
+        attribution,
+        ...(providerLogo ? { providerLogo } : {}),
+      };
+    }
     return { mode: 'unconfigured', attribution: 'Map provider not configured' };
   }
   if (environment.NODE_ENV !== 'development')

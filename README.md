@@ -2,7 +2,7 @@
 
 A local-first GPS art app: turn a simple drawing into a connected walking, running, or cycling route on real streets.
 
-This checkout includes **durable route-generation jobs and best-shape-match search** alongside the GPS-art workspace. At `/workspace`, choose an area center anywhere on the map, draw or import a shape, then search an adjustable radius or optionally let the optimizer compare several drawing sizes without a target distance. Review real street geometry, measured distance, shape similarity, alternatives, and warnings; selecting an alternative fits the map to that route. Search is limited by the region loaded into Valhalla; the local Rhône-Alpes graph covers the Lyon workspace. Drawings and homepage artwork are target art, not navigable routes.
+This checkout includes **durable route-generation jobs and best-shape-match search** alongside the GPS-art workspace. At `/workspace`, choose an area center anywhere on the map, draw or import a shape, then search an adjustable radius or optionally let the optimizer compare several drawing sizes without a target distance. Review real street geometry, measured distance, shape similarity, alternatives, and warnings; selecting an alternative fits the map to that route. Route search works only where the configured Valhalla service has road data. Local development defaults to a Rhône-Alpes graph around Lyon; the low-traffic Vercel portfolio option can use Valhalla's public demo graph. Drawings and homepage artwork are target art, not navigable routes.
 
 ## Requirements
 

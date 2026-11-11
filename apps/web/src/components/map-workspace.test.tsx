@@ -265,6 +265,23 @@ describe('map workspace with a mocked renderer', () => {
     expect(map.remove).toHaveBeenCalledOnce();
   });
 
+  it('shows the MapTiler logo and linked credits for MapTiler styles', () => {
+    render(
+      <MapWorkspace
+        configuration={{ ...configuration, providerLogo: 'maptiler' }}
+      />,
+    );
+
+    expect(screen.getByRole('img', { name: 'MapTiler' })).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: /OpenStreetMap contributors/ }),
+    ).toHaveAttribute('href', 'https://www.openstreetmap.org/copyright');
+    expect(screen.getByRole('link', { name: 'MapTiler' })).toHaveAttribute(
+      'href',
+      'https://www.maptiler.com/',
+    );
+  });
+
   it('previews the selected drawing on the map using a distinct target source', async () => {
     render(<MapWorkspace configuration={configuration} />);
     const map = await mountedMap();

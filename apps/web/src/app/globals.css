@@ -1879,6 +1879,16 @@ footer p {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+.map-provider-logo {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+}
+.map-provider-logo img {
+  display: block;
+  width: 78px;
+  height: auto;
+}
 .map-bottom-note {
   display: flex;
   gap: 11px;

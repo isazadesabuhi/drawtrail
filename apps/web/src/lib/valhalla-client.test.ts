@@ -125,6 +125,7 @@ describe('Valhalla client', () => {
     const client = new ValhallaClient({
       baseUrl: 'https://router.example.test',
       apiKey: 'a'.repeat(32),
+      clientId: 'drawtrail.vercel.app',
       fetch: fetcher,
     });
     const coordinates: [number, number][] = [
@@ -141,6 +142,9 @@ describe('Valhalla client', () => {
     for (const [, init] of fetcher.mock.calls) {
       expect(new Headers(init?.headers).get('x-drawtrail-routing-key')).toBe(
         'a'.repeat(32),
+      );
+      expect(new Headers(init?.headers).get('x-client-id')).toBe(
+        'drawtrail.vercel.app',
       );
     }
   });

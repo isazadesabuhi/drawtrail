@@ -29,6 +29,9 @@ const router = new ValhallaClient({
   ...(process.env.VALHALLA_API_KEY
     ? { apiKey: process.env.VALHALLA_API_KEY }
     : {}),
+  ...(process.env.VALHALLA_CLIENT_ID
+    ? { clientId: process.env.VALHALLA_CLIENT_ID }
+    : {}),
   timeoutMs: 12_000,
   retries: 1,
 });
