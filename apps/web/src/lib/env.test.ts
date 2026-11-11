@@ -3,7 +3,10 @@ import { readServerConfig } from './env.mjs';
 
 describe('server environment', () => {
   it('starts without services for the scaffold', () => {
-    expect(readServerConfig({})).toEqual({ VALHALLA_URL: undefined });
+    expect(readServerConfig({})).toEqual({
+      VALHALLA_URL: undefined,
+      VALHALLA_API_KEY: undefined,
+    });
   });
   it('explains missing routing configuration when requested', () => {
     expect(() => readServerConfig({}, true)).toThrow(
@@ -23,6 +26,15 @@ describe('server environment', () => {
       );
     },
   );
+  it('accepts an optional routing service key', () => {
+    const key = 'a'.repeat(32);
+    expect(readServerConfig({ VALHALLA_API_KEY: key }).VALHALLA_API_KEY).toBe(
+      key,
+    );
+  });
+  it('rejects short routing service keys', () => {
+    expect(() => readServerConfig({ VALHALLA_API_KEY: 'too-short' })).toThrow();
+  });
   it.each(['file:///private/router', 'ftp://router.example.test', ''])(
     'rejects an unsupported router URL',
     (url) => {

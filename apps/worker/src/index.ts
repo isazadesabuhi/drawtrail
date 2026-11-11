@@ -26,6 +26,9 @@ const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
 const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
 const router = new ValhallaClient({
   baseUrl: process.env.VALHALLA_URL ?? 'http://127.0.0.1:8002',
+  ...(process.env.VALHALLA_API_KEY
+    ? { apiKey: process.env.VALHALLA_API_KEY }
+    : {}),
   timeoutMs: 12_000,
   retries: 1,
 });

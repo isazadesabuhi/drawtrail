@@ -116,6 +116,35 @@ describe('Valhalla client', () => {
     expect(route.distanceMeters).toBe(1250);
   });
 
+  it('sends the optional routing key to the route and elevation endpoints', async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input) =>
+      String(input).includes('/height')
+        ? Response.json({ height: [100, 120] })
+        : success(),
+    );
+    const client = new ValhallaClient({
+      baseUrl: 'https://router.example.test',
+      apiKey: 'a'.repeat(32),
+      fetch: fetcher,
+    });
+    const coordinates: [number, number][] = [
+      [1.5, 42],
+      [1.50001, 42.00001],
+    ];
+    const route = await client.route(
+      'walking',
+      coordinates[0]!,
+      coordinates[1]!,
+    );
+    await client.elevation(coordinates, route.distanceMeters);
+
+    for (const [, init] of fetcher.mock.calls) {
+      expect(new Headers(init?.headers).get('x-drawtrail-routing-key')).toBe(
+        'a'.repeat(32),
+      );
+    }
+  });
+
   it('requests walking/running with pedestrian costing and optional walking preferences', async () => {
     const fetcher = vi.fn<typeof fetch>(async () => success());
     const client = new ValhallaClient({

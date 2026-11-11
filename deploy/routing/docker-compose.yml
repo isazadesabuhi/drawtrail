@@ -1,0 +1,52 @@
+services:
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:3.9.1
+    expose:
+      - '8002'
+    environment:
+      tile_urls: ${VALHALLA_TILE_URL:-https://download.geofabrik.de/europe/france/rhone-alpes-latest.osm.pbf}
+      server_threads: ${VALHALLA_SERVER_THREADS:-2}
+      build_admins: 'True'
+      build_time_zones: 'False'
+      build_transit: 'False'
+      build_elevation: 'True'
+      build_tar: 'True'
+      serve_tiles: 'True'
+      tileset_name: valhalla_tiles
+    volumes:
+      - valhalla_tiles:/custom_files
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl --globoff --fail --silent --show-error
+          'http://127.0.0.1:8002/route?json={"locations":[{"lat":45.764,"lon":4.8357},{"lat":45.768,"lon":4.841}],"costing":"pedestrian","units":"kilometers"}'
+          > /dev/null
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30m
+
+  gateway:
+    image: caddy:2-alpine
+    environment:
+      ROUTING_DOMAIN: ${ROUTING_DOMAIN:?Set ROUTING_DOMAIN in .env}
+      VALHALLA_API_KEY: ${VALHALLA_API_KEY:?Set VALHALLA_API_KEY in .env}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      valhalla:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  valhalla_tiles:
+  caddy_data:
+  caddy_config:

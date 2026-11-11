@@ -42,6 +42,7 @@ export interface ValhallaRoute {
 
 export interface ValhallaClientOptions {
   baseUrl: string | URL;
+  apiKey?: string;
   timeoutMs?: number;
   retries?: number;
   fetch?: typeof fetch;
@@ -196,12 +197,14 @@ export class ValhallaClient {
   private readonly timeoutMs: number;
   private readonly retries: number;
   private readonly fetcher: typeof fetch;
+  private readonly apiKey: string | undefined;
 
   constructor(options: ValhallaClientOptions) {
     this.baseUrl = new URL(options.baseUrl);
     this.timeoutMs = options.timeoutMs ?? 10_000;
     this.retries = options.retries ?? 1;
     this.fetcher = options.fetch ?? fetch;
+    this.apiKey = options.apiKey?.trim() || undefined;
     if (
       this.retries < 0 ||
       this.retries > 3 ||
@@ -239,7 +242,10 @@ export class ValhallaClient {
     try {
       const response = await this.fetcher(new URL('/height', this.baseUrl), {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'content-type': 'application/json',
+          ...(this.apiKey ? { 'x-drawtrail-routing-key': this.apiKey } : {}),
+        },
         body: JSON.stringify({
           shape: locations.map(({ coordinate: [lon, lat] }) => ({ lon, lat })),
           range: false,
@@ -408,7 +414,12 @@ export class ValhallaClient {
         controller.abort();
       }, this.timeoutMs);
       try {
-        const response = await this.fetcher(url, { signal: controller.signal });
+        const response = await this.fetcher(url, {
+          ...(this.apiKey
+            ? { headers: { 'x-drawtrail-routing-key': this.apiKey } }
+            : {}),
+          signal: controller.signal,
+        });
         const body: unknown = await response.json().catch(() => null);
         if (!response.ok) {
           const error = mapEngineError(response.status, body);
