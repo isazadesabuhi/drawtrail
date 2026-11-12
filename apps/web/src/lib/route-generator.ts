@@ -180,6 +180,7 @@ async function generateSingleRoute(
 
   const routeCoordinates: LngLat[] = [];
   let distance = 0;
+  let maximumSnapDistanceMeters = 0;
   for (const [from, to, waypointIndex] of segments) {
     if (signal?.aborted)
       return failure(
@@ -221,6 +222,11 @@ async function generateSingleRoute(
         waypointIndex,
       );
     }
+    maximumSnapDistanceMeters = Math.max(
+      maximumSnapDistanceMeters,
+      distanceMeters(coordinates[0]!, from, request.center),
+      distanceMeters(coordinates.at(-1)!, to, request.center),
+    );
     const previous = routeCoordinates.at(-1);
     if (
       previous &&
@@ -257,6 +263,10 @@ async function generateSingleRoute(
   }
 
   const similarity = scoreLineSimilarity(target, routeLine, request.center);
+  const snapPenalty = Math.min(
+    0.35,
+    Math.max(0, maximumSnapDistanceMeters - 100) / 4_000,
+  );
   const retracing = measureRetracing(routeLine, request.center);
   const requestedDistanceMeters =
     request.targetDistanceKm === undefined
@@ -273,6 +283,11 @@ async function generateSingleRoute(
   }
   if (similarity.normalizedError > 0.1) {
     warnings.push('The street route differs noticeably from the drawn shape.');
+  }
+  if (maximumSnapDistanceMeters >= 300) {
+    warnings.push(
+      `A route waypoint snapped up to ${Math.round(maximumSnapDistanceMeters / 50) * 50} m from the drawn line.`,
+    );
   }
   if (retracing.percent > 0.25) {
     warnings.push(
@@ -302,7 +317,7 @@ async function generateSingleRoute(
     },
     distanceMeters: distance,
     requestedDistanceMeters,
-    similarityScore: similarity.score,
+    similarityScore: Math.max(0, similarity.score - snapPenalty),
     retracingMeters: retracing.repeatedMeters,
     waypointCount: waypoints.length,
     warnings,

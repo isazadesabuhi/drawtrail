@@ -558,12 +558,13 @@ describe('map workspace with a mocked renderer', () => {
       targetDistanceKm: 3,
       loop: true,
       settings: {
+        maxWaypoints: 16,
         searchArea: {
           radiusMeters: 2000,
           candidateCount: 8,
           maxDistanceDeviationRatio: 0.4,
           maxRuntimeMs: 30000,
-          maxRouterRequests: 80,
+          maxRouterRequests: 160,
         },
       },
     });

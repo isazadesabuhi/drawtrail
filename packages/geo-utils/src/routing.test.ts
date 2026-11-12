@@ -73,6 +73,18 @@ describe('routing geometry utilities', () => {
     );
   });
 
+  it('penalizes a route that traces the same shape in the wrong order', () => {
+    const reversed: GeoJSONLineString = {
+      type: 'LineString',
+      coordinates: [...lShape.coordinates].reverse(),
+    };
+    const ordered = scoreLineSimilarity(lShape, lShape, anchor);
+    const outOfOrder = scoreLineSimilarity(lShape, reversed, anchor);
+    expect(ordered.score).toBeCloseTo(1);
+    expect(outOfOrder.orderedError).toBeGreaterThan(0.2);
+    expect(outOfOrder.score).toBeLessThan(ordered.score);
+  });
+
   it('detects a repeated out-and-back segment and keeps a single loop low', () => {
     const outAndBack: GeoJSONLineString = {
       type: 'LineString',

@@ -143,7 +143,12 @@ export function scoreLineSimilarity(
   target: GeoJSONLineString,
   route: GeoJSONLineString,
   anchor: LngLat,
-): { score: number; normalizedError: number; cornerError: number } {
+): {
+  score: number;
+  normalizedError: number;
+  cornerError: number;
+  orderedError: number;
+} {
   const targetPoints = metricPoints(target, anchor);
   const routePoints = metricPoints(route, anchor);
   const targetDistances = cumulativeLengths(targetPoints);
@@ -164,6 +169,33 @@ export function scoreLineSimilarity(
     );
   const targetSamples = resample(targetPoints, targetDistances, targetLength);
   const routeSamples = resample(routePoints, routeDistances, routeLength);
+  // Discrete Frechet distance compares the lines in order, so a route that
+  // visits the right places in the wrong sequence does not score as a match.
+  let previousFrechet = Array<number>(routeSamples.length).fill(Infinity);
+  for (let targetIndex = 0; targetIndex < targetSamples.length; targetIndex++) {
+    const currentFrechet = Array<number>(routeSamples.length).fill(Infinity);
+    for (let routeIndex = 0; routeIndex < routeSamples.length; routeIndex++) {
+      const [targetEast, targetNorth] = targetSamples[targetIndex]!;
+      const [routeEast, routeNorth] = routeSamples[routeIndex]!;
+      const distance = Math.hypot(
+        targetEast - routeEast,
+        targetNorth - routeNorth,
+      );
+      if (targetIndex === 0 && routeIndex === 0) {
+        currentFrechet[routeIndex] = distance;
+      } else {
+        const predecessor = Math.min(
+          targetIndex > 0 ? previousFrechet[routeIndex]! : Infinity,
+          routeIndex > 0 ? currentFrechet[routeIndex - 1]! : Infinity,
+          targetIndex > 0 && routeIndex > 0
+            ? previousFrechet[routeIndex - 1]!
+            : Infinity,
+        );
+        currentFrechet[routeIndex] = Math.max(distance, predecessor);
+      }
+    }
+    previousFrechet = currentFrechet;
+  }
   const meanNearest = (
     source: readonly EastNorth[],
     destination: readonly EastNorth[],
@@ -192,6 +224,7 @@ export function scoreLineSimilarity(
     ),
   );
   const normalizedError = symmetricMean / diagonal;
+  const orderedError = previousFrechet.at(-1)! / diagonal;
   const targetCorners = targetPoints.filter(
     (_, index) =>
       index > 0 &&
@@ -213,11 +246,13 @@ export function scoreLineSimilarity(
         ) /
         targetCorners.length /
         diagonal;
-  const combinedError = normalizedError * 0.8 + cornerError * 0.2;
+  const combinedError =
+    normalizedError * 0.55 + orderedError * 0.3 + cornerError * 0.15;
   return {
     score: Math.max(0, Math.min(1, 1 - combinedError)),
     normalizedError: combinedError,
     cornerError,
+    orderedError,
   };
 }
 

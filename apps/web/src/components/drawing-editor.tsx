@@ -277,7 +277,8 @@ function DrawingSession({
             continuityToleranceMeters: 2,
           },
           settings: {
-            maxWaypoints: 8,
+            // More control points keep routed streets closer to bends in the sketch.
+            maxWaypoints: 16,
             seed: `${drawing.name}:${selected.id}:${placementIndex}`,
             preferences: {
               hills: routeSettings.hills,
@@ -297,7 +298,7 @@ function DrawingSession({
                     radiusMeters: routeSettings.searchRadiusMeters,
                     candidateCount: 8,
                     maxRuntimeMs: 30_000,
-                    maxRouterRequests: 80,
+                    maxRouterRequests: 160,
                     ...(routeSettings.maxDistanceDeviationPercent === null ||
                     routeSettings.bestShapeMatch
                       ? {}

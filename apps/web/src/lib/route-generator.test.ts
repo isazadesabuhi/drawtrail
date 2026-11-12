@@ -112,6 +112,38 @@ describe('route generator', () => {
     expect(firstRequest[1]).toEqual(result.targetGeometry.coordinates[0]);
   });
 
+  it('warns and lowers the score when road snapping pulls the route off the sketch', async () => {
+    const request = await readRequest();
+    request.bounds.radiusMeters = 25_000;
+    const ideal = await generateRoute(request, fixtureRouter());
+    const distantSnap: RouteSegmenter = async (mode, from, to) => {
+      const offset = 0.01;
+      const coordinates: [number, number][] = [
+        [from[0] + offset, from[1]],
+        [to[0] + offset, to[1]],
+      ];
+      return {
+        mode,
+        geometry: { type: 'LineString', coordinates },
+        distanceMeters: lineLengthMeters(
+          { type: 'LineString', coordinates },
+          anchor,
+        ),
+      };
+    };
+    const snapped = await generateRoute(request, distantSnap);
+
+    expect(ideal.status).toBe('success');
+    expect(snapped.status).toBe('success');
+    if (ideal.status !== 'success' || snapped.status !== 'success') return;
+    expect(
+      snapped.warnings.some((warning) =>
+        /snapped up to \d+ m from the drawn line/.test(warning),
+      ),
+    ).toBe(true);
+    expect(snapped.similarityScore).toBeLessThan(ideal.similarityScore);
+  });
+
   it('searches shape sizes and ranks by drawing match when no distance target is set', async () => {
     const request = await readRequest();
     delete request.targetDistanceKm;
