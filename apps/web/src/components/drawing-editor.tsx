@@ -14,7 +14,6 @@ import type {
   DrawingStroke,
   GeoJSONFeatureCollection,
   LngLat,
-  ActivityMode,
 } from '@drawtrail/types';
 import {
   changeDrawing,
@@ -33,12 +32,14 @@ import {
 } from '@drawtrail/geo-utils';
 import {
   apiEnvelopeSchema,
-  activityModeSchema,
   drawingSchema,
   routeGenerationSuccessSchema,
-  type RoutePreferences,
   type RouteGenerationSuccess,
 } from '@drawtrail/validation';
+import {
+  DEFAULT_ROUTE_SETTINGS,
+  type RouteSettings,
+} from '../lib/route-settings';
 import { readDrawingDraft, writeDrawingDraft } from '../lib/drawing-draft';
 import { importSvg, MAX_SVG_BYTES } from '../lib/svg-import';
 import {
@@ -110,14 +111,14 @@ async function readGenerationResponse(
 
 export function DrawingEditor({
   startPoint = null,
-  searchAreaRadiusMeters = null,
-  onSearchAreaRadiusChange = () => {},
+  routeSettings = DEFAULT_ROUTE_SETTINGS,
+  onEditRouteSettings = () => {},
   onPreview = () => {},
   onGenerated = () => {},
 }: {
   startPoint?: LngLat | null;
-  searchAreaRadiusMeters?: number | null;
-  onSearchAreaRadiusChange?: (radiusMeters: number | null) => void;
+  routeSettings?: RouteSettings;
+  onEditRouteSettings?: () => void;
   onPreview?: (geometry: GeoJSONFeatureCollection) => void;
   onGenerated?: (result: RouteGenerationSuccess) => void;
 }) {
@@ -129,8 +130,8 @@ export function DrawingEditor({
   return hydrated ? (
     <DrawingSession
       startPoint={startPoint}
-      searchAreaRadiusMeters={searchAreaRadiusMeters}
-      onSearchAreaRadiusChange={onSearchAreaRadiusChange}
+      routeSettings={routeSettings}
+      onEditRouteSettings={onEditRouteSettings}
       onPreview={onPreview}
       onGenerated={onGenerated}
     />
@@ -153,14 +154,14 @@ function loadInitialDraft() {
 
 function DrawingSession({
   startPoint,
-  searchAreaRadiusMeters,
-  onSearchAreaRadiusChange,
+  routeSettings,
+  onEditRouteSettings,
   onPreview,
   onGenerated,
 }: {
   startPoint: LngLat | null;
-  searchAreaRadiusMeters: number | null;
-  onSearchAreaRadiusChange: (radiusMeters: number | null) => void;
+  routeSettings: RouteSettings;
+  onEditRouteSettings: () => void;
   onPreview: (geometry: GeoJSONFeatureCollection) => void;
   onGenerated: (result: RouteGenerationSuccess) => void;
 }) {
@@ -182,18 +183,6 @@ function DrawingSession({
   const [candidate, setCandidate] = useState<Drawing | null>(null);
   const [busy, setBusy] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [mode, setMode] = useState<ActivityMode>('walking');
-  const [hillPreference, setHillPreference] =
-    useState<RoutePreferences['hills']>('balanced');
-  const [cyclingRoads, setCyclingRoads] =
-    useState<RoutePreferences['cyclingRoads']>('balanced');
-  const [cyclingSurface, setCyclingSurface] =
-    useState<RoutePreferences['cyclingSurface']>('any');
-  const [targetDistanceKm, setTargetDistanceKm] = useState('3');
-  const [bestShapeMatch, setBestShapeMatch] = useState(false);
-  const [closeLoop, setCloseLoop] = useState(false);
-  const [maxDistanceDeviationPercent, setMaxDistanceDeviationPercent] =
-    useState<string | null>(null);
   const [placementIndex, setPlacementIndex] = useState(0);
   const uploadTicket = useRef(0);
   const generationController = useRef<AbortController | null>(null);
@@ -250,7 +239,9 @@ function DrawingSession({
     generationController.current = controller;
     setGenerating(true);
     setFeedback({ error: false, text: 'Finding a connected street route…' });
-    const boundsDistanceKm = bestShapeMatch ? 18 : Number(targetDistanceKm);
+    const boundsDistanceKm = routeSettings.bestShapeMatch
+      ? 18
+      : Number(routeSettings.targetDistanceKm);
     try {
       const response = await fetch('/api/v1/generate', {
         method: 'POST',
@@ -262,19 +253,19 @@ function DrawingSession({
         body: JSON.stringify({
           drawing: { ...drawing, strokes: [selected] },
           center: startPoint,
-          mode,
-          ...(bestShapeMatch
+          mode: routeSettings.mode,
+          ...(routeSettings.bestShapeMatch
             ? {}
-            : { targetDistanceKm: Number(targetDistanceKm) }),
-          loop: closeLoop || selected.closed,
+            : { targetDistanceKm: Number(routeSettings.targetDistanceKm) }),
+          loop: routeSettings.closeLoop || selected.closed,
           bounds: {
             radiusMeters: Math.min(
               50_000,
               Math.max(
                 1500,
-                (searchAreaRadiusMeters ?? 0) +
+                (routeSettings.searchRadiusMeters ?? 0) +
                   boundsDistanceKm * 1200 +
-                  (searchAreaRadiusMeters === null
+                  (routeSettings.searchRadiusMeters === null
                     ? Math.hypot(
                         candidate.offsetEastMeters,
                         candidate.offsetNorthMeters,
@@ -289,9 +280,9 @@ function DrawingSession({
             maxWaypoints: 8,
             seed: `${drawing.name}:${selected.id}:${placementIndex}`,
             preferences: {
-              hills: hillPreference,
-              cyclingRoads,
-              cyclingSurface,
+              hills: routeSettings.hills,
+              cyclingRoads: routeSettings.cyclingRoads,
+              cyclingSurface: routeSettings.cyclingSurface,
             },
             placement: {
               rotationDegrees: candidate.rotationDegrees,
@@ -299,19 +290,21 @@ function DrawingSession({
               offsetEastMeters: candidate.offsetEastMeters,
               offsetNorthMeters: candidate.offsetNorthMeters,
             },
-            ...(searchAreaRadiusMeters === null
+            ...(routeSettings.searchRadiusMeters === null
               ? {}
               : {
                   searchArea: {
-                    radiusMeters: searchAreaRadiusMeters,
+                    radiusMeters: routeSettings.searchRadiusMeters,
                     candidateCount: 8,
                     maxRuntimeMs: 30_000,
                     maxRouterRequests: 80,
-                    ...(maxDistanceDeviationPercent === null || bestShapeMatch
+                    ...(routeSettings.maxDistanceDeviationPercent === null ||
+                    routeSettings.bestShapeMatch
                       ? {}
                       : {
                           maxDistanceDeviationRatio:
-                            Number(maxDistanceDeviationPercent) / 100,
+                            Number(routeSettings.maxDistanceDeviationPercent) /
+                            100,
                         }),
                   },
                 }),
@@ -621,219 +614,36 @@ function DrawingSession({
                     Preview placement on map
                   </button>
                 </details>
-                <div className="generation-settings">
-                  <label htmlFor="route-activity">Activity</label>
-                  <select
-                    id="route-activity"
-                    value={mode}
-                    onChange={(event) =>
-                      setMode(activityModeSchema.parse(event.target.value))
-                    }
+                <section
+                  className="route-plan-summary"
+                  aria-label="Route setup summary"
+                >
+                  <p className="eyebrow">ROUTE SETUP</p>
+                  <h3>
+                    {routeSettings.mode === 'cycling'
+                      ? 'Cycling'
+                      : routeSettings.mode === 'running'
+                        ? 'Running'
+                        : 'Walking'}
+                    {' · '}
+                    {routeSettings.bestShapeMatch
+                      ? 'Best match to drawing'
+                      : `${routeSettings.targetDistanceKm} km`}
+                  </h3>
+                  <p>
+                    {routeSettings.searchRadiusMeters === null
+                      ? 'Starting near your selected point.'
+                      : `Searching within ${(routeSettings.searchRadiusMeters / 1000).toFixed(2)} km of your selected point. The route may go beyond the search radius.`}
+                  </p>
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={onEditRouteSettings}
                   >
-                    <option value="walking">Walking</option>
-                    <option value="running">Running</option>
-                    <option value="cycling">Cycling</option>
-                  </select>
-                  <details className="advanced-route-options">
-                    <summary>Route preferences</summary>
-                    <label htmlFor="route-hills">Hill preference</label>
-                    <select
-                      id="route-hills"
-                      value={hillPreference}
-                      onChange={(event) =>
-                        setHillPreference(
-                          event.target.value as typeof hillPreference,
-                        )
-                      }
-                    >
-                      <option value="flatter">Prefer flatter routes</option>
-                      <option value="balanced">No strong preference</option>
-                      <option value="hilly">Hills are okay</option>
-                    </select>
-                    {mode === 'cycling' && (
-                      <>
-                        <label htmlFor="cycling-roads">
-                          Cycling road preference
-                        </label>
-                        <select
-                          id="cycling-roads"
-                          value={cyclingRoads}
-                          onChange={(event) =>
-                            setCyclingRoads(
-                              event.target.value as typeof cyclingRoads,
-                            )
-                          }
-                        >
-                          <option value="paths">
-                            Prefer paths and cycleways
-                          </option>
-                          <option value="balanced">Balanced</option>
-                          <option value="roads">Roads are okay</option>
-                        </select>
-                        <label htmlFor="cycling-surface">Cycling surface</label>
-                        <select
-                          id="cycling-surface"
-                          value={cyclingSurface}
-                          onChange={(event) =>
-                            setCyclingSurface(
-                              event.target.value as typeof cyclingSurface,
-                            )
-                          }
-                        >
-                          <option value="paved">
-                            Prefer paved (road bike)
-                          </option>
-                          <option value="any">
-                            Mixed surfaces (hybrid bike)
-                          </option>
-                          <option value="rough">
-                            Rough or gravel is okay (mountain bike)
-                          </option>
-                        </select>
-                      </>
-                    )}
-                    <p className="field-hint">
-                      Preferences can change the distance and shape match.
-                      Available streets may limit the result. Hill preferences
-                      need elevation data in the routing region.
-                    </p>
-                  </details>
-                  <label className="loop-setting" htmlFor="best-shape-match">
-                    <input
-                      id="best-shape-match"
-                      type="checkbox"
-                      checked={bestShapeMatch}
-                      onChange={(event) =>
-                        setBestShapeMatch(event.target.checked)
-                      }
-                    />
-                    No fixed target distance (best shape match)
-                  </label>
-                  {bestShapeMatch ? (
-                    <p className="field-hint">
-                      We’ll compare several shape sizes and prioritize how well
-                      the route matches your drawing. Route length depends on
-                      the selected activity; cycling may be longer.
-                    </p>
-                  ) : (
-                    <>
-                      <label htmlFor="target-distance">
-                        Target distance (km)
-                      </label>
-                      <input
-                        id="target-distance"
-                        type="number"
-                        min="0.2"
-                        max="20"
-                        step="0.1"
-                        value={targetDistanceKm}
-                        onChange={(event) =>
-                          setTargetDistanceKm(event.target.value)
-                        }
-                      />
-                    </>
-                  )}
-                  <details className="advanced-route-options">
-                    <summary>Loop and search area</summary>
-                    <label className="loop-setting" htmlFor="close-route-loop">
-                      <input
-                        id="close-route-loop"
-                        type="checkbox"
-                        checked={closeLoop || (selected?.closed ?? false)}
-                        disabled={selected?.closed ?? false}
-                        onChange={(event) => setCloseLoop(event.target.checked)}
-                      />
-                      Close the route into a loop
-                    </label>
-                    <p className="field-hint">
-                      Closed drawings always route as loops. One stroke is
-                      routed at a time.
-                    </p>
-                    <label
-                      className="loop-setting"
-                      htmlFor="search-area-toggle"
-                    >
-                      <input
-                        id="search-area-toggle"
-                        type="checkbox"
-                        checked={searchAreaRadiusMeters !== null}
-                        onChange={(event) =>
-                          onSearchAreaRadiusChange(
-                            event.target.checked ? 2000 : null,
-                          )
-                        }
-                      />
-                      Search for the shape around my chosen area
-                    </label>
-                    {searchAreaRadiusMeters !== null && (
-                      <>
-                        <label htmlFor="search-area-radius">
-                          Search radius around the map pin (km)
-                        </label>
-                        <input
-                          id="search-area-radius"
-                          type="number"
-                          min="0.25"
-                          max="25"
-                          step="0.25"
-                          value={searchAreaRadiusMeters / 1000}
-                          onChange={(event) => {
-                            const radiusMeters =
-                              Number(event.target.value) * 1000;
-                            if (radiusMeters >= 250 && radiusMeters <= 25_000)
-                              onSearchAreaRadiusChange(radiusMeters);
-                          }}
-                        />
-                        <p className="field-hint">
-                          We’ll try 8 positions inside the circle and keep the
-                          best route. The local routing graph must cover the
-                          area.
-                        </p>
-                        {!bestShapeMatch && (
-                          <>
-                            <label
-                              className="loop-setting"
-                              htmlFor="distance-deviation-toggle"
-                            >
-                              <input
-                                id="distance-deviation-toggle"
-                                type="checkbox"
-                                checked={maxDistanceDeviationPercent !== null}
-                                onChange={(event) =>
-                                  setMaxDistanceDeviationPercent(
-                                    event.target.checked ? '40' : null,
-                                  )
-                                }
-                              />
-                              Enforce a maximum distance difference
-                            </label>
-                            {maxDistanceDeviationPercent !== null && (
-                              <>
-                                <label htmlFor="distance-deviation-limit">
-                                  Maximum difference (%)
-                                </label>
-                                <input
-                                  id="distance-deviation-limit"
-                                  type="number"
-                                  min="5"
-                                  max="100"
-                                  step="5"
-                                  value={maxDistanceDeviationPercent}
-                                  onChange={(event) => {
-                                    const value = Number(event.target.value);
-                                    if (value >= 5 && value <= 100)
-                                      setMaxDistanceDeviationPercent(
-                                        event.target.value,
-                                      );
-                                  }}
-                                />
-                              </>
-                            )}
-                          </>
-                        )}
-                      </>
-                    )}
-                  </details>
+                    Change route options
+                  </button>
+                </section>
+                <div className="generation-settings">
                   <button
                     type="button"
                     className="primary-button generate-route-button"

@@ -674,6 +674,93 @@ footer p {
   font-size: 16px;
   font-style: italic;
 }
+.route-options-panel > select,
+.route-options-panel .route-option-field input,
+.route-preference-options select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #dce1d3;
+  border-radius: 5px;
+  padding: 9px 10px;
+  color: var(--ink);
+  background: #fffefb;
+  font-size: 12px;
+}
+.route-options-panel > label:not(.checkbox-row),
+.route-option-field > label,
+.route-preference-options > label {
+  display: block;
+  margin: 15px 0 7px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.route-option-field {
+  margin-top: 12px;
+}
+.route-radius-toggle {
+  margin-top: 18px;
+}
+.checkbox-row {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 9px;
+  color: #52604d;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  line-height: 1.5;
+}
+.checkbox-row input[type='checkbox'] {
+  flex: 0 0 16px;
+  width: 16px;
+  min-height: 16px;
+  margin: 1px 0 0;
+  accent-color: var(--green);
+}
+.advanced-route-options,
+.route-preference-options {
+  margin-top: 16px;
+  padding: 11px;
+  border: 1px solid #e1e6d9;
+  border-radius: 6px;
+  background: #f8f9f4;
+}
+.advanced-route-options > summary,
+.route-preference-options > summary {
+  color: #52604d;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.advanced-route-options[open] > summary {
+  margin-bottom: 14px;
+}
+.advanced-route-options > .field-hint {
+  margin: 6px 0 12px 25px;
+}
+.route-options-panel > .set-start-button {
+  width: 100%;
+  margin-top: 20px;
+}
+.route-plan-summary {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #e1e6d9;
+  border-radius: 6px;
+  background: #f8f9f4;
+}
+.route-plan-summary .eyebrow {
+  margin: 0 0 7px;
+}
+.route-plan-summary h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.route-plan-summary p:not(.eyebrow) {
+  margin: 8px 0;
+  color: #66715f;
+  font-size: 11px;
+  line-height: 1.55;
+}
 
 .drawing-editor-heading {
   display: flex;

@@ -163,6 +163,16 @@ function enterCoordinates(latitude: string, longitude: string) {
   });
   fireEvent.click(screen.getByRole('button', { name: 'Set start point' }));
 }
+function enterRouteOptions() {
+  fireEvent.click(screen.getByRole('button', { name: 'Set route options' }));
+}
+function continueToDrawing() {
+  fireEvent.click(screen.getByRole('button', { name: 'Continue to draw' }));
+}
+function enterDrawing() {
+  enterRouteOptions();
+  continueToDrawing();
+}
 
 beforeEach(() => {
   const values = new Map<string, string>();
@@ -199,17 +209,21 @@ describe('map workspace with a mocked renderer', () => {
     const map = await mountedMap();
     act(() => map.emit('load'));
     enterCoordinates('45.764', '4.8357');
-    fireEvent.click(screen.getByRole('button', { name: 'Draw your idea' }));
-
+    enterRouteOptions();
     expect(screen.getByLabelText('Activity')).toBeVisible();
     expect(screen.getByLabelText('Target distance (km)')).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Generate street route' }),
+      screen.getByLabelText('Search around my starting point'),
     ).toBeVisible();
     expect(screen.getByLabelText('Hill preference')).not.toBeVisible();
+    expect(screen.getByText('More options').closest('details')).toHaveProperty(
+      'open',
+      false,
+    );
+    continueToDrawing();
     expect(
-      screen.getByText('Route preferences').closest('details'),
-    ).toHaveProperty('open', false);
+      screen.getByRole('button', { name: 'Generate street route' }),
+    ).toBeVisible();
     expect(screen.getByText('Move & shape').closest('details')).toHaveProperty(
       'open',
       false,
@@ -287,7 +301,7 @@ describe('map workspace with a mocked renderer', () => {
     const map = await mountedMap();
     act(() => map.emit('load'));
     enterCoordinates('45.764', '4.8357');
-    fireEvent.click(screen.getByRole('button', { name: /Draw your idea/ }));
+    enterDrawing();
     fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
     fireEvent.click(screen.getByText('Adjust placement or preview on map'));
     expect(screen.getByText('Position 1 of 12')).toBeVisible();
@@ -444,15 +458,11 @@ describe('map workspace with a mocked renderer', () => {
     const map = await mountedMap();
     act(() => map.emit('load'));
     enterCoordinates('45.77', '4.84');
-    fireEvent.click(screen.getByRole('button', { name: /Draw your idea/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
-    fireEvent.click(screen.getByText('Loop and search area'));
-    fireEvent.click(
-      screen.getByLabelText('Search for the shape around my chosen area'),
+    enterRouteOptions();
+    fireEvent.click(screen.getByLabelText('Search around my starting point'));
+    expect(screen.getByLabelText('Search radius from start (km)')).toHaveValue(
+      2,
     );
-    expect(
-      screen.getByLabelText('Search radius around the map pin (km)'),
-    ).toHaveValue(2);
     expect(
       engine.sources.get('drawtrail-search-area')?.setData,
     ).toHaveBeenLastCalledWith(
@@ -463,10 +473,13 @@ describe('map workspace with a mocked renderer', () => {
         ],
       }),
     );
+    fireEvent.click(screen.getByText('More options'));
     fireEvent.click(
       screen.getByLabelText('Enforce a maximum distance difference'),
     );
     expect(screen.getByLabelText('Maximum difference (%)')).toHaveValue(40);
+    continueToDrawing();
+    fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
     fireEvent.click(
       screen.getByRole('button', { name: 'Generate street route' }),
     );
@@ -590,7 +603,7 @@ describe('map workspace with a mocked renderer', () => {
     const map = await mountedMap();
     act(() => map.emit('load'));
     enterCoordinates('45.77', '4.84');
-    fireEvent.click(screen.getByRole('button', { name: /Draw your idea/ }));
+    enterDrawing();
     fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
     fireEvent.click(
       screen.getByRole('button', { name: 'Generate street route' }),
@@ -647,12 +660,12 @@ describe('map workspace with a mocked renderer', () => {
     const map = await mountedMap();
     act(() => map.emit('load'));
     enterCoordinates('45.77', '4.84');
-    fireEvent.click(screen.getByRole('button', { name: /Draw your idea/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
+    enterRouteOptions();
     expect(screen.queryByLabelText('Cycling surface')).toBeNull();
     fireEvent.change(screen.getByLabelText('Activity'), {
       target: { value: 'cycling' },
     });
+    fireEvent.click(screen.getByText('More options'));
     fireEvent.click(screen.getByText('Route preferences'));
     fireEvent.change(screen.getByLabelText('Hill preference'), {
       target: { value: 'flatter' },
@@ -664,10 +677,14 @@ describe('map workspace with a mocked renderer', () => {
       target: { value: 'paved' },
     });
     fireEvent.click(
-      screen.getByLabelText('No fixed target distance (best shape match)'),
+      screen.getByLabelText(
+        'Let DrawTrail choose the distance to best match my drawing',
+      ),
     );
     expect(screen.queryByLabelText('Target distance (km)')).toBeNull();
-    expect(screen.getByText(/cycling may be longer/i)).toBeVisible();
+    expect(screen.getByText(/cycling routes may be longer/i)).toBeVisible();
+    continueToDrawing();
+    fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
     fireEvent.click(
       screen.getByRole('button', { name: 'Generate street route' }),
     );

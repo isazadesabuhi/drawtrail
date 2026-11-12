@@ -9,6 +9,7 @@ import {
   type FormEvent,
 } from 'react';
 import type { GeoJSONFeatureCollection, LngLat } from '@drawtrail/types';
+import { activityModeSchema } from '@drawtrail/validation';
 import { LYON_CENTER, LYON_ZOOM } from '@drawtrail/geo-utils';
 import {
   lngLatSchema,
@@ -28,6 +29,10 @@ import { MovingTimeEstimate } from './moving-time-estimate';
 import { RouteRepairPanel } from './route-repair-panel';
 import { SavedRouteLibrary } from './saved-route-library';
 import type { SavedRoute } from '../lib/saved-routes';
+import {
+  DEFAULT_ROUTE_SETTINGS,
+  type RouteSettings,
+} from '../lib/route-settings';
 
 const EMPTY_FEATURES: GeoJSONFeatureCollection = {
   type: 'FeatureCollection',
@@ -80,7 +85,7 @@ export function MapWorkspace({
   configuration: MapConfiguration;
   geocoder?: Geocoder | null;
 }) {
-  const [stage, setStage] = useState<'place' | 'draw'>('place');
+  const [stage, setStage] = useState<'place' | 'options' | 'draw'>('place');
   const [drawingVisited, setDrawingVisited] = useState(false);
   const [startPoint, setStartPoint] = useState<LngLat | null>(null);
   const [targetGeometry, setTargetGeometry] =
@@ -95,9 +100,9 @@ export function MapWorkspace({
     result: RouteGenerationSuccess;
     selectedAlternativeIndex: number;
   } | null>(null);
-  const [searchAreaRadiusMeters, setSearchAreaRadiusMeters] = useState<
-    number | null
-  >(null);
+  const [routeSettings, setRouteSettings] = useState<RouteSettings>(
+    DEFAULT_ROUTE_SETTINGS,
+  );
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [selectionError, setSelectionError] = useState('');
@@ -114,10 +119,10 @@ export function MapWorkspace({
   const searchController = useRef<AbortController | null>(null);
   const searchAreaGeometry = useMemo(
     () =>
-      startPoint && searchAreaRadiusMeters !== null
-        ? searchCircle(startPoint, searchAreaRadiusMeters)
+      startPoint && routeSettings.searchRadiusMeters !== null
+        ? searchCircle(startPoint, routeSettings.searchRadiusMeters)
         : EMPTY_FEATURES,
-    [startPoint, searchAreaRadiusMeters],
+    [startPoint, routeSettings.searchRadiusMeters],
   );
   const activeAlternative =
     routeResult?.alternatives?.[selectedAlternativeIndex] ?? null;
@@ -187,6 +192,10 @@ export function MapWorkspace({
   function openDrawing() {
     setDrawingVisited(true);
     setStage('draw');
+  }
+
+  function openRouteOptions() {
+    if (startPoint) setStage('options');
   }
 
   function showAlternative(index: number) {
@@ -328,23 +337,39 @@ export function MapWorkspace({
           <p className="eyebrow">YOUR IDEA STARTS SOMEWHERE</p>
           <h1>
             {stage === 'place'
-              ? 'Choose an area for your route.'
-              : 'Draw your idea.'}
+              ? 'Choose a starting point.'
+              : stage === 'options'
+                ? 'Set up your route.'
+                : 'Draw your idea.'}
           </h1>
           <p>
             {stage === 'place'
-              ? 'Choose a start point. Routes work only where the selected routing service has street data.'
-              : 'Draw a shape or choose a preset. You can generate a route without previewing first.'}
+              ? 'Click the map or search for a place to choose where your route begins.'
+              : stage === 'options'
+                ? 'Choose an activity and distance. Add a search radius to find routes around your start point.'
+                : 'Draw a shape or choose a preset. You can generate a route without previewing first.'}
           </p>
         </div>
         <div className="editor-heading-actions">
-          <button
-            className="primary-button"
-            type="button"
-            onClick={openDrawing}
-          >
-            Draw your idea
-          </button>
+          {stage === 'place' && (
+            <button
+              className="primary-button"
+              type="button"
+              onClick={openRouteOptions}
+              disabled={!startPoint}
+            >
+              Set route options
+            </button>
+          )}
+          {stage === 'draw' && (
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => setStage('options')}
+            >
+              Change route options
+            </button>
+          )}
           <span className="editor-region">
             <span aria-hidden="true">↗</span> Choose an area
           </span>
@@ -360,162 +385,416 @@ export function MapWorkspace({
           </button>
         </li>
         <li
+          className={stage === 'options' ? 'current-step' : ''}
+          aria-current={stage === 'options' ? 'step' : undefined}
+        >
+          <button
+            type="button"
+            disabled={!startPoint}
+            onClick={openRouteOptions}
+          >
+            <span>02</span> Set your route
+          </button>
+        </li>
+        <li
           className={stage === 'draw' ? 'current-step' : ''}
           aria-current={stage === 'draw' ? 'step' : undefined}
         >
-          <span>02</span> Draw your idea
+          <button type="button" disabled={!startPoint} onClick={openDrawing}>
+            <span>03</span> Draw your idea
+          </button>
         </li>
         <li>
-          <span>03</span> Find a street route{' '}
+          <span>04</span> Find a street route{' '}
           <small>
             {routeResult
               ? 'Route ready'
               : stage === 'draw'
                 ? 'Generate from your drawing'
-                : 'Draw a shape first'}
+                : 'Choose your options'}
           </small>
         </li>
       </ol>
-      <div hidden={stage !== 'place'}>
+      <div hidden={stage === 'draw'}>
         <div className="editor-grid">
           <aside className="editor-sidebar" aria-label="Start point settings">
-            <section className="editor-panel">
-              <p className="eyebrow">A PLACE TO BEGIN</p>
-              <h2>Set your start point</h2>
-              <p className="panel-description">
-                Click the map or enter coordinates. Drag the orange pin to
-                adjust it.
-              </p>
-              <form onSubmit={search} role="search" className="place-search">
-                <label htmlFor="place-query">Search local places</label>
-                <div className="search-field-row">
-                  <input
-                    id="place-query"
-                    type="search"
-                    value={query}
-                    disabled={!geocoder}
-                    maxLength={120}
-                    placeholder="Try Bellecour"
-                    onChange={(event) => {
-                      searchController.current?.abort();
-                      setQuery(event.target.value);
-                      setResults([]);
-                      setSearchStatus('idle');
-                    }}
-                  />
-                  <button
-                    className="secondary-button"
-                    type="submit"
-                    disabled={
-                      !geocoder ||
-                      query.trim().length < 2 ||
-                      searchStatus === 'loading'
-                    }
-                  >
-                    Find
-                  </button>
-                </div>
-                <p className="field-hint">
-                  {geocoder
-                    ? `${geocoder.label} is a small place list, not full address search. Use coordinates for other places.`
-                    : 'Place search is disabled. The map and coordinates still work.'}
+            {stage === 'place' && (
+              <section className="editor-panel">
+                <p className="eyebrow">A PLACE TO BEGIN</p>
+                <h2>Set your start point</h2>
+                <p className="panel-description">
+                  Click the map or enter coordinates. Drag the orange pin to
+                  adjust it.
                 </p>
-              </form>
-              {searchStatus === 'loading' && (
-                <p role="status" className="field-hint">
-                  Looking for your place…
-                </p>
-              )}
-              {searchStatus === 'empty' && (
-                <p role="status" className="search-feedback">
-                  No local place found. Try another name or use coordinates.
-                </p>
-              )}
-              {searchStatus === 'error' && (
-                <p role="alert" className="search-feedback">
-                  Place search is unavailable. Try again, or use coordinates.
-                </p>
-              )}
-              {results.length > 0 && (
-                <ul className="place-results" aria-label="Place results">
-                  {results.map((place) => (
-                    <li key={place.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (selectPoint(place.center)) {
-                            centerOn(place.center, 15);
-                            setResults([]);
-                            setQuery(place.name);
-                          }
-                        }}
-                      >
-                        <span>{place.name}</span>
-                        <span aria-hidden="true">↗</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="coordinate-divider">
-                <span>or use coordinates</span>
-              </div>
-              <form
-                className="coordinate-form"
-                onSubmit={applyCoordinates}
-                noValidate
-              >
-                <div className="coordinate-fields">
-                  <div>
-                    <label htmlFor="start-latitude">Latitude</label>
+                <form onSubmit={search} role="search" className="place-search">
+                  <label htmlFor="place-query">Search local places</label>
+                  <div className="search-field-row">
                     <input
-                      id="start-latitude"
-                      type="number"
-                      step="any"
-                      inputMode="decimal"
-                      value={latitude}
-                      placeholder="45.764000"
-                      aria-invalid={Boolean(selectionError)}
-                      aria-describedby={
-                        selectionError ? 'selection-error' : 'coordinate-help'
-                      }
-                      onChange={(event) => setLatitude(event.target.value)}
+                      id="place-query"
+                      type="search"
+                      value={query}
+                      disabled={!geocoder}
+                      maxLength={120}
+                      placeholder="Try Bellecour"
+                      onChange={(event) => {
+                        searchController.current?.abort();
+                        setQuery(event.target.value);
+                        setResults([]);
+                        setSearchStatus('idle');
+                      }}
                     />
-                  </div>
-                  <div>
-                    <label htmlFor="start-longitude">Longitude</label>
-                    <input
-                      id="start-longitude"
-                      type="number"
-                      step="any"
-                      inputMode="decimal"
-                      value={longitude}
-                      placeholder="4.835700"
-                      aria-invalid={Boolean(selectionError)}
-                      aria-describedby={
-                        selectionError ? 'selection-error' : 'coordinate-help'
+                    <button
+                      className="secondary-button"
+                      type="submit"
+                      disabled={
+                        !geocoder ||
+                        query.trim().length < 2 ||
+                        searchStatus === 'loading'
                       }
-                      onChange={(event) => setLongitude(event.target.value)}
-                    />
+                    >
+                      Find
+                    </button>
                   </div>
-                </div>
-                <p className="field-hint" id="coordinate-help">
-                  Decimal degrees · latitude first. Routing only works where the
-                  configured Valhalla graph has map data.
-                </p>
-                {selectionError && (
-                  <p id="selection-error" role="alert" className="field-error">
-                    {selectionError}
+                  <p className="field-hint">
+                    {geocoder
+                      ? `${geocoder.label} is a small place list, not full address search. Use coordinates for other places.`
+                      : 'Place search is disabled. The map and coordinates still work.'}
+                  </p>
+                </form>
+                {searchStatus === 'loading' && (
+                  <p role="status" className="field-hint">
+                    Looking for your place…
                   </p>
                 )}
+                {searchStatus === 'empty' && (
+                  <p role="status" className="search-feedback">
+                    No local place found. Try another name or use coordinates.
+                  </p>
+                )}
+                {searchStatus === 'error' && (
+                  <p role="alert" className="search-feedback">
+                    Place search is unavailable. Try again, or use coordinates.
+                  </p>
+                )}
+                {results.length > 0 && (
+                  <ul className="place-results" aria-label="Place results">
+                    {results.map((place) => (
+                      <li key={place.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectPoint(place.center)) {
+                              centerOn(place.center, 15);
+                              setResults([]);
+                              setQuery(place.name);
+                            }
+                          }}
+                        >
+                          <span>{place.name}</span>
+                          <span aria-hidden="true">↗</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="coordinate-divider">
+                  <span>or use coordinates</span>
+                </div>
+                <form
+                  className="coordinate-form"
+                  onSubmit={applyCoordinates}
+                  noValidate
+                >
+                  <div className="coordinate-fields">
+                    <div>
+                      <label htmlFor="start-latitude">Latitude</label>
+                      <input
+                        id="start-latitude"
+                        type="number"
+                        step="any"
+                        inputMode="decimal"
+                        value={latitude}
+                        placeholder="45.764000"
+                        aria-invalid={Boolean(selectionError)}
+                        aria-describedby={
+                          selectionError ? 'selection-error' : 'coordinate-help'
+                        }
+                        onChange={(event) => setLatitude(event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="start-longitude">Longitude</label>
+                      <input
+                        id="start-longitude"
+                        type="number"
+                        step="any"
+                        inputMode="decimal"
+                        value={longitude}
+                        placeholder="4.835700"
+                        aria-invalid={Boolean(selectionError)}
+                        aria-describedby={
+                          selectionError ? 'selection-error' : 'coordinate-help'
+                        }
+                        onChange={(event) => setLongitude(event.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <p className="field-hint" id="coordinate-help">
+                    Decimal degrees · latitude first. Routing only works where
+                    the configured Valhalla graph has map data.
+                  </p>
+                  {selectionError && (
+                    <p
+                      id="selection-error"
+                      role="alert"
+                      className="field-error"
+                    >
+                      {selectionError}
+                    </p>
+                  )}
+                  <button
+                    className="primary-button set-start-button"
+                    type="submit"
+                  >
+                    Set start point <span aria-hidden="true">↗</span>
+                  </button>
+                </form>
+              </section>
+            )}
+            {stage === 'options' && (
+              <section
+                className="editor-panel route-options-panel"
+                aria-label="Route options"
+              >
+                <p className="eyebrow">YOUR ROUTE</p>
+                <h2>What would you like?</h2>
+                <p className="panel-description">
+                  Choose the essentials. The search radius tells DrawTrail where
+                  to look for a starting area; routes can extend beyond it.
+                </p>
+                <label htmlFor="route-activity">Activity</label>
+                <select
+                  id="route-activity"
+                  value={routeSettings.mode}
+                  onChange={(event) => {
+                    const parsed = activityModeSchema.safeParse(
+                      event.target.value,
+                    );
+                    if (parsed.success)
+                      setRouteSettings((current) => ({
+                        ...current,
+                        mode: parsed.data,
+                      }));
+                  }}
+                >
+                  <option value="walking">Walking</option>
+                  <option value="running">Running</option>
+                  <option value="cycling">Cycling</option>
+                </select>
+                {!routeSettings.bestShapeMatch && (
+                  <div className="route-option-field">
+                    <label htmlFor="route-distance">Target distance (km)</label>
+                    <input
+                      id="route-distance"
+                      type="number"
+                      min="0.5"
+                      max="100"
+                      step="0.1"
+                      value={routeSettings.targetDistanceKm}
+                      onChange={(event) =>
+                        setRouteSettings((current) => ({
+                          ...current,
+                          targetDistanceKm: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+                <label className="checkbox-row route-radius-toggle">
+                  <input
+                    type="checkbox"
+                    checked={routeSettings.searchRadiusMeters !== null}
+                    onChange={(event) =>
+                      setRouteSettings((current) => ({
+                        ...current,
+                        searchRadiusMeters: event.target.checked ? 2000 : null,
+                      }))
+                    }
+                  />
+                  Search around my starting point
+                </label>
+                {routeSettings.searchRadiusMeters !== null && (
+                  <div className="route-option-field">
+                    <label htmlFor="route-radius">
+                      Search radius from start (km)
+                    </label>
+                    <input
+                      id="route-radius"
+                      type="number"
+                      min="0.5"
+                      max="50"
+                      step="0.5"
+                      value={(
+                        routeSettings.searchRadiusMeters / 1000
+                      ).toString()}
+                      onChange={(event) => {
+                        const value = Number(event.target.value);
+                        if (Number.isFinite(value) && value > 0)
+                          setRouteSettings((current) => ({
+                            ...current,
+                            searchRadiusMeters: Math.round(value * 1000),
+                          }));
+                      }}
+                    />
+                    <p className="field-hint">
+                      The map circle shows the search area. The route may go
+                      beyond it.
+                    </p>
+                  </div>
+                )}
+                <details className="advanced-route-options">
+                  <summary>More options</summary>
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={routeSettings.bestShapeMatch}
+                      onChange={(event) =>
+                        setRouteSettings((current) => ({
+                          ...current,
+                          bestShapeMatch: event.target.checked,
+                        }))
+                      }
+                    />
+                    Let DrawTrail choose the distance to best match my drawing
+                  </label>
+                  <p className="field-hint">
+                    The distance can vary. Cycling routes may be longer than
+                    walking or running routes.
+                  </p>
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={routeSettings.closeLoop}
+                      onChange={(event) =>
+                        setRouteSettings((current) => ({
+                          ...current,
+                          closeLoop: event.target.checked,
+                        }))
+                      }
+                    />
+                    Make it a loop
+                  </label>
+                  {routeSettings.searchRadiusMeters !== null &&
+                    !routeSettings.bestShapeMatch && (
+                      <>
+                        <label className="checkbox-row">
+                          <input
+                            type="checkbox"
+                            checked={
+                              routeSettings.maxDistanceDeviationPercent !== null
+                            }
+                            onChange={(event) =>
+                              setRouteSettings((current) => ({
+                                ...current,
+                                maxDistanceDeviationPercent: event.target
+                                  .checked
+                                  ? '40'
+                                  : null,
+                              }))
+                            }
+                          />
+                          Enforce a maximum distance difference
+                        </label>
+                        {routeSettings.maxDistanceDeviationPercent !== null && (
+                          <div className="route-option-field">
+                            <label htmlFor="maximum-distance-difference">
+                              Maximum difference (%)
+                            </label>
+                            <input
+                              id="maximum-distance-difference"
+                              type="number"
+                              min="5"
+                              max="100"
+                              step="5"
+                              value={routeSettings.maxDistanceDeviationPercent}
+                              onChange={(event) =>
+                                setRouteSettings((current) => ({
+                                  ...current,
+                                  maxDistanceDeviationPercent:
+                                    event.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  <details className="route-preference-options">
+                    <summary>Route preferences</summary>
+                    <label htmlFor="hills-preference">Hill preference</label>
+                    <select
+                      id="hills-preference"
+                      value={routeSettings.hills}
+                      onChange={(event) =>
+                        setRouteSettings((current) => ({
+                          ...current,
+                          hills: event.target.value as RouteSettings['hills'],
+                        }))
+                      }
+                    >
+                      <option value="balanced">Balanced</option>
+                      <option value="flatter">Flatter</option>
+                      <option value="hilly">Hilly</option>
+                    </select>
+                    {routeSettings.mode === 'cycling' && (
+                      <>
+                        <label htmlFor="cycling-roads">
+                          Cycling road preference
+                        </label>
+                        <select
+                          id="cycling-roads"
+                          value={routeSettings.cyclingRoads}
+                          onChange={(event) =>
+                            setRouteSettings((current) => ({
+                              ...current,
+                              cyclingRoads: event.target
+                                .value as RouteSettings['cyclingRoads'],
+                            }))
+                          }
+                        >
+                          <option value="balanced">Balanced</option>
+                          <option value="paths">Prefer cycleways</option>
+                          <option value="roads">Prefer roads</option>
+                        </select>
+                        <label htmlFor="cycling-surface">Cycling surface</label>
+                        <select
+                          id="cycling-surface"
+                          value={routeSettings.cyclingSurface}
+                          onChange={(event) =>
+                            setRouteSettings((current) => ({
+                              ...current,
+                              cyclingSurface: event.target
+                                .value as RouteSettings['cyclingSurface'],
+                            }))
+                          }
+                        >
+                          <option value="any">Any</option>
+                          <option value="paved">Prefer paved</option>
+                          <option value="rough">Prefer unpaved</option>
+                        </select>
+                      </>
+                    )}
+                  </details>
+                </details>
                 <button
                   className="primary-button set-start-button"
-                  type="submit"
+                  type="button"
+                  onClick={openDrawing}
                 >
-                  Set start point <span aria-hidden="true">↗</span>
+                  Continue to draw
                 </button>
-              </form>
-            </section>
+              </section>
+            )}
             <section
               className="selected-point-card"
               aria-labelledby="selected-point-title"
@@ -587,12 +866,13 @@ export function MapWorkspace({
               searchAreaGeometry={searchAreaGeometry}
             />
             {(targetGeometry.features.length > 0 ||
-              searchAreaRadiusMeters !== null) && (
+              routeSettings.searchRadiusMeters !== null) && (
               <div className="geometry-legend" aria-label="Map geometry legend">
-                {searchAreaRadiusMeters !== null && (
+                {routeSettings.searchRadiusMeters !== null && (
                   <span>
                     <i className="search-area-legend-swatch" /> Search area ·{' '}
-                    {(searchAreaRadiusMeters / 1000).toFixed(2)} km radius
+                    {(routeSettings.searchRadiusMeters / 1000).toFixed(2)} km
+                    radius
                   </span>
                 )}
                 {targetGeometry.features.length > 0 && (
@@ -823,8 +1103,8 @@ export function MapWorkspace({
         {drawingVisited && (
           <DrawingEditor
             startPoint={startPoint}
-            searchAreaRadiusMeters={searchAreaRadiusMeters}
-            onSearchAreaRadiusChange={setSearchAreaRadiusMeters}
+            routeSettings={routeSettings}
+            onEditRouteSettings={() => setStage('options')}
             onPreview={(geometry) => {
               setTargetGeometry(geometry);
               setRouteGeometry(EMPTY_FEATURES);
