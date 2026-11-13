@@ -46,6 +46,10 @@ const engine = vi.hoisted(() => ({
   fail: false,
 }));
 const originalStorage = Object.getOwnPropertyDescriptor(window, 'localStorage');
+const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'scrollIntoView',
+);
 
 vi.mock('maplibre-gl', () => {
   class Map {
@@ -199,11 +203,44 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  if (originalScrollIntoView)
+    Object.defineProperty(
+      HTMLElement.prototype,
+      'scrollIntoView',
+      originalScrollIntoView,
+    );
+  else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
   if (originalStorage)
     Object.defineProperty(window, 'localStorage', originalStorage);
 });
 
 describe('map workspace with a mocked renderer', () => {
+  it('smoothly scrolls to the next workspace step', async () => {
+    const scrolledElements: HTMLElement[] = [];
+    const scrollIntoView = vi.fn(function (this: HTMLElement) {
+      scrolledElements.push(this);
+    });
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    render(<MapWorkspace configuration={configuration} />);
+    const map = await mountedMap();
+    act(() => map.emit('load'));
+
+    enterCoordinates('45.764', '4.8357');
+    expect(scrolledElements.at(-1)?.textContent).toContain('Set route options');
+    expect(scrollIntoView).toHaveBeenLastCalledWith({
+      behavior: 'smooth',
+      block: 'center',
+    });
+
+    enterRouteOptions();
+    expect(scrolledElements.at(-1)).toHaveClass('route-options-panel');
+    continueToDrawing();
+    expect(scrolledElements.at(-1)).toHaveClass('drawing-stage');
+  });
+
   it('shows the basic draw controls first and keeps advanced tools collapsed', async () => {
     render(<MapWorkspace configuration={configuration} />);
     const map = await mountedMap();

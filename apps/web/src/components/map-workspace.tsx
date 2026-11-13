@@ -116,6 +116,13 @@ export function MapWorkspace({
   const [searchStatus, setSearchStatus] = useState<
     'idle' | 'loading' | 'empty' | 'error'
   >('idle');
+  const placeStepRef = useRef<HTMLElement>(null);
+  const routeOptionsRef = useRef<HTMLElement>(null);
+  const drawingStepRef = useRef<HTMLDivElement>(null);
+  const routeResultsRef = useRef<HTMLElement>(null);
+  const routeOptionsButtonRef = useRef<HTMLButtonElement>(null);
+  const previousStageRef = useRef(stage);
+  const stageRef = useRef(stage);
   const searchController = useRef<AbortController | null>(null);
   const searchAreaGeometry = useMemo(
     () =>
@@ -140,23 +147,43 @@ export function MapWorkspace({
     activeAlternative?.retracingMeters ?? routeResult?.retracingMeters;
   const activeWarnings = activeAlternative?.warnings ?? routeResult?.warnings;
 
+  const scrollTo = useCallback((element: HTMLElement | null) => {
+    if (!element || typeof element.scrollIntoView !== 'function') return;
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
+
+  useEffect(() => {
+    stageRef.current = stage;
+    const previousStage = previousStageRef.current;
+    previousStageRef.current = stage;
+    if (previousStage === stage) return;
+    if (stage === 'options') scrollTo(routeOptionsRef.current);
+    else if (stage === 'draw') scrollTo(drawingStepRef.current);
+    else if (routeResult) scrollTo(routeResultsRef.current);
+    else scrollTo(placeStepRef.current);
+  }, [routeResult, scrollTo, stage]);
+
   useEffect(() => () => searchController.current?.abort(), []);
 
-  const selectPoint = useCallback((point: LngLat): boolean => {
-    if (!lngLatSchema.safeParse(point).success) {
-      setSelectionError('Enter a valid WGS84 latitude and longitude.');
-      return false;
-    }
-    setSelectionError('');
-    setTargetGeometry(EMPTY_FEATURES);
-    setRouteGeometry(EMPTY_FEATURES);
-    setRouteResult(null);
-    setRepairUndo(null);
-    setStartPoint(point);
-    setLatitude(point[1].toFixed(6));
-    setLongitude(point[0].toFixed(6));
-    return true;
-  }, []);
+  const selectPoint = useCallback(
+    (point: LngLat): boolean => {
+      if (!lngLatSchema.safeParse(point).success) {
+        setSelectionError('Enter a valid WGS84 latitude and longitude.');
+        return false;
+      }
+      setSelectionError('');
+      setTargetGeometry(EMPTY_FEATURES);
+      setRouteGeometry(EMPTY_FEATURES);
+      setRouteResult(null);
+      setRepairUndo(null);
+      setStartPoint(point);
+      setLatitude(point[1].toFixed(6));
+      setLongitude(point[0].toFixed(6));
+      if (stageRef.current === 'place') scrollTo(routeOptionsButtonRef.current);
+      return true;
+    },
+    [scrollTo],
+  );
 
   function centerOn(center: LngLat, zoom = LYON_ZOOM) {
     setView((previous) => ({ center, zoom, revision: previous.revision + 1 }));
@@ -357,6 +384,7 @@ export function MapWorkspace({
               type="button"
               onClick={openRouteOptions}
               disabled={!startPoint}
+              ref={routeOptionsButtonRef}
             >
               Set route options
             </button>
@@ -419,7 +447,7 @@ export function MapWorkspace({
         <div className="editor-grid">
           <aside className="editor-sidebar" aria-label="Start point settings">
             {stage === 'place' && (
-              <section className="editor-panel">
+              <section className="editor-panel" ref={placeStepRef}>
                 <p className="eyebrow">A PLACE TO BEGIN</p>
                 <h2>Set your start point</h2>
                 <p className="panel-description">
@@ -565,6 +593,7 @@ export function MapWorkspace({
               <section
                 className="editor-panel route-options-panel"
                 aria-label="Route options"
+                ref={routeOptionsRef}
               >
                 <p className="eyebrow">YOUR ROUTE</p>
                 <h2>What would you like?</h2>
@@ -892,6 +921,7 @@ export function MapWorkspace({
               <section
                 className="route-result-card"
                 aria-label="Generated route results"
+                ref={routeResultsRef}
               >
                 <div className="selected-point-heading">
                   <h2>Generated street route</h2>
@@ -1099,7 +1129,11 @@ export function MapWorkspace({
           saved on this device; the map location is not saved across reloads.
         </p>
       </div>
-      <div hidden={stage !== 'draw'}>
+      <div
+        className="drawing-stage"
+        hidden={stage !== 'draw'}
+        ref={drawingStepRef}
+      >
         {drawingVisited && (
           <DrawingEditor
             startPoint={startPoint}
