@@ -111,12 +111,14 @@ async function readGenerationResponse(
 
 export function DrawingEditor({
   startPoint = null,
+  areaOnly = false,
   routeSettings = DEFAULT_ROUTE_SETTINGS,
   onEditRouteSettings = () => {},
   onPreview = () => {},
   onGenerated = () => {},
 }: {
   startPoint?: LngLat | null;
+  areaOnly?: boolean;
   routeSettings?: RouteSettings;
   onEditRouteSettings?: () => void;
   onPreview?: (geometry: GeoJSONFeatureCollection) => void;
@@ -130,6 +132,7 @@ export function DrawingEditor({
   return hydrated ? (
     <DrawingSession
       startPoint={startPoint}
+      areaOnly={areaOnly}
       routeSettings={routeSettings}
       onEditRouteSettings={onEditRouteSettings}
       onPreview={onPreview}
@@ -154,12 +157,14 @@ function loadInitialDraft() {
 
 function DrawingSession({
   startPoint,
+  areaOnly,
   routeSettings,
   onEditRouteSettings,
   onPreview,
   onGenerated,
 }: {
   startPoint: LngLat | null;
+  areaOnly: boolean;
   routeSettings: RouteSettings;
   onEditRouteSettings: () => void;
   onPreview: (geometry: GeoJSONFeatureCollection) => void;
@@ -297,6 +302,7 @@ function DrawingSession({
                   searchArea: {
                     radiusMeters: routeSettings.searchRadiusMeters,
                     candidateCount: 8,
+                    ...(areaOnly ? { routeWithinRadius: true } : {}),
                     maxRuntimeMs: 30_000,
                     maxRouterRequests: 160,
                     ...(routeSettings.maxDistanceDeviationPercent === null ||
@@ -571,10 +577,18 @@ function DrawingSession({
             className="drawing-tool-card placement-tool-card"
             aria-labelledby="placement-title"
           >
-            <h3 id="placement-title">Place it near your start</h3>
+            <h3 id="placement-title">
+              {areaOnly
+                ? 'Place it inside your search area'
+                : 'Place it near your start'}
+            </h3>
             {startPoint ? (
               <>
-                <p>The shape is placed near your start point automatically.</p>
+                <p>
+                  {areaOnly
+                    ? 'The route can start anywhere inside the circle and must stay within it.'
+                    : 'The shape is placed near your start point automatically.'}
+                </p>
                 <details className="placement-options">
                   <summary>Adjust placement or preview on map</summary>
                   <div className="placement-actions">
@@ -634,7 +648,9 @@ function DrawingSession({
                   <p>
                     {routeSettings.searchRadiusMeters === null
                       ? 'Starting near your selected point.'
-                      : `Searching within ${(routeSettings.searchRadiusMeters / 1000).toFixed(2)} km of your selected point. The route may go beyond the search radius.`}
+                      : areaOnly
+                        ? `The whole route must fit inside the ${(routeSettings.searchRadiusMeters / 1000).toFixed(2)} km radius.`
+                        : `Searching within ${(routeSettings.searchRadiusMeters / 1000).toFixed(2)} km of your selected point. The route may go beyond the search radius.`}
                   </p>
                   <button
                     type="button"

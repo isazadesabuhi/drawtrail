@@ -207,6 +207,54 @@ describe('route generator', () => {
     );
   });
 
+  it('requires every routed coordinate to stay inside an area-only radius', async () => {
+    const request = await readRequest();
+    request.bounds.radiusMeters = 7000;
+    request.settings.searchArea = {
+      radiusMeters: 1000,
+      candidateCount: 2,
+      routeWithinRadius: true,
+    };
+    const outsideRouter: RouteSegmenter = async (mode, from, to) => {
+      const coordinates: LngLat[] = [
+        [from[0] + 0.02, from[1]],
+        [to[0] + 0.02, to[1]],
+      ];
+      return {
+        mode,
+        geometry: { type: 'LineString', coordinates },
+        distanceMeters: lineLengthMeters(
+          { type: 'LineString', coordinates },
+          anchor,
+        ),
+      };
+    };
+
+    await expect(generateRoute(request, outsideRouter)).resolves.toMatchObject({
+      status: 'error',
+      code: 'infeasible_waypoint',
+      message: expect.stringContaining('No route fit entirely inside'),
+    });
+
+    request.settings.searchArea.radiusMeters = 10_000;
+    const inside = await generateRoute(request, fixtureRouter());
+    expect(inside.status).toBe('success');
+    if (inside.status === 'success') {
+      expect(
+        inside.route.geometry.coordinates.every(
+          ([longitude, latitude]) =>
+            lineLengthMeters(
+              {
+                type: 'LineString',
+                coordinates: [request.center, [longitude, latitude]],
+              },
+              request.center,
+            ) <= 10_000,
+        ),
+      ).toBe(true);
+    }
+  });
+
   it.each(['fixed', 'area', 'best-shape'] as const)(
     'preserves preferences and cancellation for every segment in %s generation',
     async (search) => {

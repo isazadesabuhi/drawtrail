@@ -241,6 +241,40 @@ describe('map workspace with a mocked renderer', () => {
     expect(scrolledElements.at(-1)).toHaveClass('drawing-stage');
   });
 
+  it('lets users choose a search area without setting a route start point', async () => {
+    render(<MapWorkspace configuration={configuration} />);
+    const map = await mountedMap();
+    act(() => map.emit('load'));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Find a route inside an area instead',
+      }),
+    );
+    expect(
+      screen.getByLabelText('Search area center', { selector: 'output' }),
+    ).toHaveTextContent('Click the map to choose the search area center.');
+    act(() => map.emit('click', [4.84, 45.77]));
+    expect(
+      screen.getByLabelText('Search area center', { selector: 'output' }),
+    ).toHaveTextContent('45.770000° N, 4.840000° E');
+    expect(
+      engine.sources.get('drawtrail-search-area')?.setData,
+    ).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: 'FeatureCollection',
+        features: [
+          expect.objectContaining({ properties: { kind: 'search-area' } }),
+        ],
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Set route options' }));
+    expect(screen.getByLabelText('Maximum route radius (km)')).toHaveValue(5);
+    expect(screen.getByText(/keep the whole route inside it/i)).toBeVisible();
+    expect(
+      screen.queryByLabelText('Search around my starting point'),
+    ).toBeNull();
+  });
+
   it('shows the basic draw controls first and keeps advanced tools collapsed', async () => {
     render(<MapWorkspace configuration={configuration} />);
     const map = await mountedMap();

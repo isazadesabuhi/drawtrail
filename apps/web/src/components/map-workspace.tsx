@@ -88,6 +88,8 @@ export function MapWorkspace({
   const [stage, setStage] = useState<'place' | 'options' | 'draw'>('place');
   const [drawingVisited, setDrawingVisited] = useState(false);
   const [startPoint, setStartPoint] = useState<LngLat | null>(null);
+  const [areaSearchMode, setAreaSearchMode] = useState(false);
+  const [searchAreaCenter, setSearchAreaCenter] = useState<LngLat | null>(null);
   const [targetGeometry, setTargetGeometry] =
     useState<GeoJSONFeatureCollection>(EMPTY_FEATURES);
   const [routeGeometry, setRouteGeometry] =
@@ -123,13 +125,15 @@ export function MapWorkspace({
   const routeOptionsButtonRef = useRef<HTMLButtonElement>(null);
   const previousStageRef = useRef(stage);
   const stageRef = useRef(stage);
+  const areaSearchModeRef = useRef(areaSearchMode);
   const searchController = useRef<AbortController | null>(null);
+  const searchCenter = areaSearchMode ? searchAreaCenter : startPoint;
   const searchAreaGeometry = useMemo(
     () =>
-      startPoint && routeSettings.searchRadiusMeters !== null
-        ? searchCircle(startPoint, routeSettings.searchRadiusMeters)
+      searchCenter && routeSettings.searchRadiusMeters !== null
+        ? searchCircle(searchCenter, routeSettings.searchRadiusMeters)
         : EMPTY_FEATURES,
-    [startPoint, routeSettings.searchRadiusMeters],
+    [routeSettings.searchRadiusMeters, searchCenter],
   );
   const activeAlternative =
     routeResult?.alternatives?.[selectedAlternativeIndex] ?? null;
@@ -154,6 +158,7 @@ export function MapWorkspace({
 
   useEffect(() => {
     stageRef.current = stage;
+    areaSearchModeRef.current = areaSearchMode;
     const previousStage = previousStageRef.current;
     previousStageRef.current = stage;
     if (previousStage === stage) return;
@@ -161,7 +166,7 @@ export function MapWorkspace({
     else if (stage === 'draw') scrollTo(drawingStepRef.current);
     else if (routeResult) scrollTo(routeResultsRef.current);
     else scrollTo(placeStepRef.current);
-  }, [routeResult, scrollTo, stage]);
+  }, [areaSearchMode, routeResult, scrollTo, stage]);
 
   useEffect(() => () => searchController.current?.abort(), []);
 
@@ -177,12 +182,32 @@ export function MapWorkspace({
       setRouteResult(null);
       setRepairUndo(null);
       setStartPoint(point);
+      setAreaSearchMode(false);
+      setSearchAreaCenter(null);
+      setRouteSettings((current) => ({
+        ...current,
+        searchRadiusMeters: areaSearchModeRef.current
+          ? null
+          : current.searchRadiusMeters,
+      }));
       setLatitude(point[1].toFixed(6));
       setLongitude(point[0].toFixed(6));
       if (stageRef.current === 'place') scrollTo(routeOptionsButtonRef.current);
       return true;
     },
     [scrollTo],
+  );
+
+  const handleMapSelect = useCallback(
+    (point: LngLat): boolean => {
+      if (!areaSearchModeRef.current) return selectPoint(point);
+      if (!lngLatSchema.safeParse(point).success) return false;
+      setSearchAreaCenter(point);
+      setSelectionError('');
+      scrollTo(routeOptionsButtonRef.current);
+      return true;
+    },
+    [scrollTo, selectPoint],
   );
 
   function centerOn(center: LngLat, zoom = LYON_ZOOM) {
@@ -217,12 +242,30 @@ export function MapWorkspace({
   }
 
   function openDrawing() {
+    if (!startPoint && !(areaSearchMode && searchAreaCenter)) return;
     setDrawingVisited(true);
     setStage('draw');
   }
 
   function openRouteOptions() {
-    if (startPoint) setStage('options');
+    if (startPoint || (areaSearchMode && searchAreaCenter)) setStage('options');
+  }
+
+  function beginAreaSearch() {
+    setAreaSearchMode(true);
+    setSearchAreaCenter(null);
+    setStartPoint(null);
+    setTargetGeometry(EMPTY_FEATURES);
+    setRouteGeometry(EMPTY_FEATURES);
+    setRouteResult(null);
+    setRepairUndo(null);
+    setRouteSettings((current) => ({ ...current, searchRadiusMeters: 5000 }));
+  }
+
+  function chooseStartPointMode() {
+    setAreaSearchMode(false);
+    setSearchAreaCenter(null);
+    setRouteSettings((current) => ({ ...current, searchRadiusMeters: null }));
   }
 
   function showAlternative(index: number) {
@@ -371,9 +414,13 @@ export function MapWorkspace({
           </h1>
           <p>
             {stage === 'place'
-              ? 'Click the map or search for a place to choose where your route begins.'
+              ? areaSearchMode
+                ? 'Choose the center of your search area on the map. The route can start anywhere inside the radius you set.'
+                : 'Click the map or search for a place to choose where your route begins.'
               : stage === 'options'
-                ? 'Choose an activity and distance. Add a search radius to find routes around your start point.'
+                ? areaSearchMode
+                  ? 'Choose an activity, distance, and radius. The whole route will stay inside the search circle.'
+                  : 'Choose an activity and distance. Add a search radius to find routes around your start point.'
                 : 'Draw a shape or choose a preset. You can generate a route without previewing first.'}
           </p>
         </div>
@@ -383,7 +430,7 @@ export function MapWorkspace({
               className="primary-button"
               type="button"
               onClick={openRouteOptions}
-              disabled={!startPoint}
+              disabled={!startPoint && !(areaSearchMode && searchAreaCenter)}
               ref={routeOptionsButtonRef}
             >
               Set route options
@@ -418,7 +465,7 @@ export function MapWorkspace({
         >
           <button
             type="button"
-            disabled={!startPoint}
+            disabled={!startPoint && !(areaSearchMode && searchAreaCenter)}
             onClick={openRouteOptions}
           >
             <span>02</span> Set your route
@@ -428,7 +475,11 @@ export function MapWorkspace({
           className={stage === 'draw' ? 'current-step' : ''}
           aria-current={stage === 'draw' ? 'step' : undefined}
         >
-          <button type="button" disabled={!startPoint} onClick={openDrawing}>
+          <button
+            type="button"
+            disabled={!startPoint && !(areaSearchMode && searchAreaCenter)}
+            onClick={openDrawing}
+          >
             <span>03</span> Draw your idea
           </button>
         </li>
@@ -451,8 +502,9 @@ export function MapWorkspace({
                 <p className="eyebrow">A PLACE TO BEGIN</p>
                 <h2>Set your start point</h2>
                 <p className="panel-description">
-                  Click the map or enter coordinates. Drag the orange pin to
-                  adjust it.
+                  {areaSearchMode
+                    ? 'Click the map to choose the center of the area. This is not the route start.'
+                    : 'Click the map or enter coordinates. Drag the orange pin to adjust it.'}
                 </p>
                 <form onSubmit={search} role="search" className="place-search">
                   <label htmlFor="place-query">Search local places</label>
@@ -598,8 +650,9 @@ export function MapWorkspace({
                 <p className="eyebrow">YOUR ROUTE</p>
                 <h2>What would you like?</h2>
                 <p className="panel-description">
-                  Choose the essentials. The search radius tells DrawTrail where
-                  to look for a starting area; routes can extend beyond it.
+                  {areaSearchMode
+                    ? 'Choose the essentials. DrawTrail will look for a route anywhere in the selected circle and keep the whole route inside it.'
+                    : 'Choose the essentials. The search radius tells DrawTrail where to look for a starting area; routes can extend beyond it.'}
                 </p>
                 <label htmlFor="route-activity">Activity</label>
                 <select
@@ -639,29 +692,39 @@ export function MapWorkspace({
                     />
                   </div>
                 )}
-                <label className="checkbox-row route-radius-toggle">
-                  <input
-                    type="checkbox"
-                    checked={routeSettings.searchRadiusMeters !== null}
-                    onChange={(event) =>
-                      setRouteSettings((current) => ({
-                        ...current,
-                        searchRadiusMeters: event.target.checked ? 2000 : null,
-                      }))
-                    }
-                  />
-                  Search around my starting point
-                </label>
+                {areaSearchMode ? (
+                  <p className="area-radius-required">
+                    A search radius is required in this mode.
+                  </p>
+                ) : (
+                  <label className="checkbox-row route-radius-toggle">
+                    <input
+                      type="checkbox"
+                      checked={routeSettings.searchRadiusMeters !== null}
+                      onChange={(event) =>
+                        setRouteSettings((current) => ({
+                          ...current,
+                          searchRadiusMeters: event.target.checked
+                            ? 2000
+                            : null,
+                        }))
+                      }
+                    />
+                    Search around my starting point
+                  </label>
+                )}
                 {routeSettings.searchRadiusMeters !== null && (
                   <div className="route-option-field">
                     <label htmlFor="route-radius">
-                      Search radius from start (km)
+                      {areaSearchMode
+                        ? 'Maximum route radius (km)'
+                        : 'Search radius from start (km)'}
                     </label>
                     <input
                       id="route-radius"
                       type="number"
                       min="0.5"
-                      max="50"
+                      max="25"
                       step="0.5"
                       value={(
                         routeSettings.searchRadiusMeters / 1000
@@ -676,8 +739,9 @@ export function MapWorkspace({
                       }}
                     />
                     <p className="field-hint">
-                      The map circle shows the search area. The route may go
-                      beyond it.
+                      {areaSearchMode
+                        ? 'The entire generated route must stay inside the map circle.'
+                        : 'The map circle shows the search area. The route may go beyond it.'}
                     </p>
                   </div>
                 )}
@@ -829,13 +893,18 @@ export function MapWorkspace({
               aria-labelledby="selected-point-title"
             >
               <div className="selected-point-heading">
-                <h2 id="selected-point-title">Your starting point</h2>
-                {startPoint && (
+                <h2 id="selected-point-title">
+                  {areaSearchMode
+                    ? 'Search area center'
+                    : 'Your starting point'}
+                </h2>
+                {(startPoint || areaSearchMode) && (
                   <button
                     className="text-button"
                     type="button"
                     onClick={() => {
                       setStartPoint(null);
+                      setSearchAreaCenter(null);
                       setTargetGeometry(EMPTY_FEATURES);
                       setRouteGeometry(EMPTY_FEATURES);
                       setRouteResult(null);
@@ -843,18 +912,27 @@ export function MapWorkspace({
                       setLatitude('');
                       setLongitude('');
                       setSelectionError('');
+                      if (areaSearchMode) setStage('place');
                     }}
                   >
                     Clear
                   </button>
                 )}
               </div>
-              <output aria-label="Selected start point">
-                {startPoint
-                  ? formatLocation(startPoint)
-                  : 'No start point selected yet.'}
+              <output
+                aria-label={
+                  areaSearchMode ? 'Search area center' : 'Selected start point'
+                }
+              >
+                {areaSearchMode
+                  ? searchAreaCenter
+                    ? formatLocation(searchAreaCenter)
+                    : 'Click the map to choose the search area center.'
+                  : startPoint
+                    ? formatLocation(startPoint)
+                    : 'No start point selected yet.'}
               </output>
-              {startPoint && (
+              {startPoint && !areaSearchMode && (
                 <p className="coordinate-order">
                   GeoJSON [longitude, latitude]
                   <br />
@@ -864,8 +942,28 @@ export function MapWorkspace({
                 </p>
               )}
               <p className="field-hint">
-                A start point is a placement, not a validated street route.
+                {areaSearchMode
+                  ? 'The generated route can begin anywhere inside the radius and must stay inside it.'
+                  : 'A start point is a placement, not a validated street route.'}
               </p>
+              {!areaSearchMode && (
+                <button
+                  className="secondary-button area-search-choice"
+                  type="button"
+                  onClick={beginAreaSearch}
+                >
+                  Find a route inside an area instead
+                </button>
+              )}
+              {areaSearchMode && (
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={chooseStartPointMode}
+                >
+                  Use a specific starting point
+                </button>
+              )}
             </section>
           </aside>
           <section className="editor-map-panel" aria-label="Map workspace">
@@ -874,7 +972,9 @@ export function MapWorkspace({
                 <span className="map-toolbar-dot" />
                 <strong>Explore the map</strong>
                 <span className="map-toolbar-hint">
-                  Pan, zoom, find your place
+                  {areaSearchMode
+                    ? 'Click the map to set the search area center'
+                    : 'Pan, zoom, find your place'}
                 </span>
               </div>
               <button
@@ -889,15 +989,16 @@ export function MapWorkspace({
               configuration={configuration}
               startPoint={startPoint}
               view={view}
-              onSelect={selectPoint}
+              onSelect={handleMapSelect}
               targetGeometry={targetGeometry}
               routeGeometry={routeGeometry}
               searchAreaGeometry={searchAreaGeometry}
             />
             {(targetGeometry.features.length > 0 ||
-              routeSettings.searchRadiusMeters !== null) && (
+              (searchCenter !== null &&
+                routeSettings.searchRadiusMeters !== null)) && (
               <div className="geometry-legend" aria-label="Map geometry legend">
-                {routeSettings.searchRadiusMeters !== null && (
+                {searchCenter && routeSettings.searchRadiusMeters !== null && (
                   <span>
                     <i className="search-area-legend-swatch" /> Search area ·{' '}
                     {(routeSettings.searchRadiusMeters / 1000).toFixed(2)} km
@@ -1136,7 +1237,8 @@ export function MapWorkspace({
       >
         {drawingVisited && (
           <DrawingEditor
-            startPoint={startPoint}
+            startPoint={searchCenter}
+            areaOnly={areaSearchMode}
             routeSettings={routeSettings}
             onEditRouteSettings={() => setStage('options')}
             onPreview={(geometry) => {

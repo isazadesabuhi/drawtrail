@@ -498,6 +498,20 @@ export async function generateRoute(
       }
       continue;
     }
+    if (
+      searchArea?.routeWithinRadius &&
+      candidate.route.geometry.coordinates.some(
+        (coordinate) =>
+          distanceMeters(coordinate, request.center, request.center) >
+          searchArea.radiusMeters,
+      )
+    ) {
+      lastFailure = failure(
+        'infeasible_waypoint',
+        'The routed path extends outside the selected search radius.',
+      );
+      continue;
+    }
     const relativeDistanceError =
       candidate.requestedDistanceMeters === null
         ? 0
@@ -584,7 +598,9 @@ export async function generateRoute(
     budgetMessage
       ? `No viable route was found before the search budget ended. ${budgetMessage}`
       : searchArea
-        ? `No route was found in the selected area after trying ${placements.length} placements.${lastFailure ? ` ${lastFailure.message}` : ''}`
+        ? searchArea.routeWithinRadius
+          ? `No route fit entirely inside the selected ${(searchArea.radiusMeters / 1000).toFixed(1)} km radius after trying ${placements.length} placements.${lastFailure ? ` ${lastFailure.message}` : ''}`
+          : `No route was found in the selected area after trying ${placements.length} placements.${lastFailure ? ` ${lastFailure.message}` : ''}`
         : `No route was found at the selected map pin after trying ${placements.length} shape sizes.${lastFailure ? ` ${lastFailure.message}` : ''}`,
     lastFailure?.waypointIndex,
   );
