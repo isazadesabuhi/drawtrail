@@ -210,10 +210,13 @@ describe('route generator', () => {
   it('requires every routed coordinate to stay inside an area-only radius', async () => {
     const request = await readRequest();
     request.bounds.radiusMeters = 7000;
+    request.settings.maxWaypoints = 16;
     request.settings.searchArea = {
       radiusMeters: 1000,
       candidateCount: 2,
       routeWithinRadius: true,
+      maxRuntimeMs: 30_000,
+      maxRouterRequests: 160,
     };
     const outsideRouter: RouteSegmenter = async (mode, from, to) => {
       const coordinates: LngLat[] = [
@@ -240,6 +243,7 @@ describe('route generator', () => {
     const inside = await generateRoute(request, fixtureRouter());
     expect(inside.status).toBe('success');
     if (inside.status === 'success') {
+      expect(inside.waypointCount).toBe(15);
       expect(
         inside.route.geometry.coordinates.every(
           ([longitude, latitude]) =>

@@ -439,7 +439,47 @@ export async function generateRoute(
     routerRequests += 1;
     return routeSegment(mode, from, to, signal, preferences);
   };
-  const ranked: Array<{ result: RouteGenerationSuccess; score: number }> = [];
+  const ranked: Array<{
+    result: RouteGenerationSuccess;
+    score: number;
+    request: RouteGenerationRequest;
+    shapeDistanceKm: number;
+  }> = [];
+  const scoreCandidate = (candidate: RouteGenerationSuccess) => {
+    const relativeDistanceError =
+      candidate.requestedDistanceMeters === null
+        ? 0
+        : Math.abs(
+            candidate.distanceMeters - candidate.requestedDistanceMeters,
+          ) / candidate.requestedDistanceMeters;
+    const retracingRatio =
+      candidate.distanceMeters > 0
+        ? candidate.retracingMeters / candidate.distanceMeters
+        : 0;
+    return (
+      candidate.similarityScore -
+      (unconstrainedDistance ? 0 : 0.25 * relativeDistanceError) -
+      0.15 * retracingRatio
+    );
+  };
+  const fitsArea = (candidate: RouteGenerationSuccess) =>
+    !searchArea?.routeWithinRadius ||
+    candidate.route.geometry.coordinates.every(
+      (coordinate) =>
+        distanceMeters(coordinate, request.center, request.center) <=
+        searchArea.radiusMeters,
+    );
+  const violatesDistanceLimit = (candidate: RouteGenerationSuccess) => {
+    if (
+      candidate.requestedDistanceMeters === null ||
+      searchArea?.maxDistanceDeviationRatio === undefined
+    )
+      return false;
+    const relativeDistanceError =
+      Math.abs(candidate.distanceMeters - candidate.requestedDistanceMeters) /
+      candidate.requestedDistanceMeters;
+    return relativeDistanceError > searchArea.maxDistanceDeviationRatio;
+  };
   let lastFailure: RouteGenerationFailure | undefined;
   const unconstrainedShapeDistancesKm = [2, 3.5, 5, 8, 12, 18];
   for (const [placementIndex, placement] of placements.entries()) {
@@ -468,15 +508,25 @@ export async function generateRoute(
         },
       },
     };
+    const shapeDistanceKm = unconstrainedDistance
+      ? unconstrainedShapeDistancesKm[
+          placementIndex % unconstrainedShapeDistancesKm.length
+        ]!
+      : request.targetDistanceKm!;
+    const coarseRequest = searchArea?.routeWithinRadius
+      ? {
+          ...candidateRequest,
+          settings: {
+            ...candidateRequest.settings,
+            maxWaypoints: Math.min(6, candidateRequest.settings.maxWaypoints),
+          },
+        }
+      : candidateRequest;
     const candidate = await generateSingleRoute(
-      candidateRequest,
+      coarseRequest,
       boundedRouter,
       signal,
-      unconstrainedDistance
-        ? unconstrainedShapeDistancesKm[
-            placementIndex % unconstrainedShapeDistancesKm.length
-          ]
-        : request.targetDistanceKm,
+      shapeDistanceKm,
     );
     onProgress?.({
       stage: 'searching',
@@ -498,46 +548,63 @@ export async function generateRoute(
       }
       continue;
     }
-    if (
-      searchArea?.routeWithinRadius &&
-      candidate.route.geometry.coordinates.some(
-        (coordinate) =>
-          distanceMeters(coordinate, request.center, request.center) >
-          searchArea.radiusMeters,
-      )
-    ) {
+    if (!fitsArea(candidate)) {
       lastFailure = failure(
         'infeasible_waypoint',
         'The routed path extends outside the selected search radius.',
       );
       continue;
     }
-    const relativeDistanceError =
-      candidate.requestedDistanceMeters === null
-        ? 0
-        : Math.abs(
-            candidate.distanceMeters - candidate.requestedDistanceMeters,
-          ) / candidate.requestedDistanceMeters;
-    if (
-      candidate.requestedDistanceMeters !== null &&
-      searchArea?.maxDistanceDeviationRatio !== undefined &&
-      relativeDistanceError > searchArea.maxDistanceDeviationRatio
-    ) {
+    if (violatesDistanceLimit(candidate)) {
       lastFailure = failure(
         'no_route',
-        `A candidate exceeded the configured ${(searchArea.maxDistanceDeviationRatio * 100).toFixed(0)}% distance-deviation limit.`,
+        `A candidate exceeded the configured ${((searchArea?.maxDistanceDeviationRatio ?? 0) * 100).toFixed(0)}% distance-deviation limit.`,
       );
       continue;
     }
-    const retracingRatio =
-      candidate.distanceMeters > 0
-        ? candidate.retracingMeters / candidate.distanceMeters
-        : 0;
-    const score =
-      candidate.similarityScore -
-      (unconstrainedDistance ? 0 : 0.25 * relativeDistanceError) -
-      0.15 * retracingRatio;
-    ranked.push({ result: candidate, score });
+    ranked.push({
+      result: candidate,
+      score: scoreCandidate(candidate),
+      request: candidateRequest,
+      shapeDistanceKm,
+    });
+  }
+
+  // Spend remaining search budget on the best area-only placements with the
+  // full waypoint count before presenting alternatives.
+  if (searchArea?.routeWithinRadius && ranked.length > 0) {
+    ranked.sort(
+      (first, second) =>
+        second.score - first.score ||
+        first.result.distanceMeters - second.result.distanceMeters,
+    );
+    for (const item of ranked.slice(0, 3)) {
+      if (routerRequests >= maxRouterRequests) {
+        budgetMessage = `Search stopped at its ${maxRouterRequests}-request routing limit.`;
+        break;
+      }
+      if (Date.now() - startedAt >= maxRuntimeMs) {
+        budgetMessage = `Search stopped at its ${Math.round(maxRuntimeMs / 1000)}-second time limit.`;
+        break;
+      }
+      const refined = await generateSingleRoute(
+        item.request,
+        boundedRouter,
+        signal,
+        item.shapeDistanceKm,
+      );
+      if (refined.status === 'error') {
+        if (refined.code === 'optimization_budget') {
+          budgetMessage = refined.message;
+          break;
+        }
+        if (refined.code === 'cancelled') return refined;
+        continue;
+      }
+      if (!fitsArea(refined) || violatesDistanceLimit(refined)) continue;
+      item.result = refined;
+      item.score = scoreCandidate(refined);
+    }
   }
 
   ranked.sort(
@@ -578,9 +645,11 @@ export async function generateRoute(
   if (best) {
     const warnings = [
       ...best.warnings,
-      searchArea
-        ? `Best of ${ranked.length} viable placements searched within a ${(searchArea.radiusMeters / 1000).toFixed(1)} km radius.`
-        : `Best shape match of ${ranked.length} viable route sizes at the selected map pin.`,
+      searchArea?.routeWithinRadius
+        ? `Best of ${ranked.length} viable placements sampled inside the ${(searchArea.radiusMeters / 1000).toFixed(1)} km radius; top placements were refined using more drawing points.`
+        : searchArea
+          ? `Best of ${ranked.length} viable placements searched within a ${(searchArea.radiusMeters / 1000).toFixed(1)} km radius.`
+          : `Best shape match of ${ranked.length} viable route sizes at the selected map pin.`,
     ];
     if (budgetMessage) warnings.push(budgetMessage);
     return addRouteElevation(

@@ -242,6 +242,40 @@ describe('map workspace with a mocked renderer', () => {
   });
 
   it('lets users choose a search area without setting a route start point', async () => {
+    const generated = {
+      status: 'success',
+      targetGeometry: {
+        type: 'LineString',
+        coordinates: [
+          [4.84, 45.77],
+          [4.841, 45.771],
+        ],
+      },
+      route: {
+        type: 'Feature',
+        properties: { mode: 'walking' },
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [4.84, 45.77],
+            [4.841, 45.771],
+          ],
+        },
+      },
+      distanceMeters: 1000,
+      requestedDistanceMeters: 3000,
+      similarityScore: 0.8,
+      retracingMeters: 0,
+      waypointCount: 2,
+      warnings: [],
+    };
+    const fetcher = vi.fn<typeof fetch>(
+      async () =>
+        new Response(JSON.stringify(apiSuccessEnvelope(generated)), {
+          status: 200,
+        }),
+    );
+    vi.stubGlobal('fetch', fetcher);
     render(<MapWorkspace configuration={configuration} />);
     const map = await mountedMap();
     act(() => map.emit('load'));
@@ -273,6 +307,24 @@ describe('map workspace with a mocked renderer', () => {
     expect(
       screen.queryByLabelText('Search around my starting point'),
     ).toBeNull();
+    continueToDrawing();
+    fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Generate street route' }),
+    );
+    expect(await screen.findByText('Generated street route')).toBeVisible();
+    const request = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body));
+    expect(request).toMatchObject({
+      center: [4.84, 45.77],
+      settings: {
+        maxWaypoints: 16,
+        searchArea: {
+          radiusMeters: 5000,
+          candidateCount: 16,
+          routeWithinRadius: true,
+        },
+      },
+    });
   });
 
   it('shows the basic draw controls first and keeps advanced tools collapsed', async () => {
