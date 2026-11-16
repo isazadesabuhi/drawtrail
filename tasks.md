@@ -1202,7 +1202,7 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 ### Decisions and changes
 
 - 2026-11-16: Completed 16-01 through 16-07 and 16-09. Pinned routes now start/close near the selected street; distance flexibility, adaptive shape refinement, absolute gap metrics, a largest-gap map overlay, and bounded radius candidate refinement are implemented. Full `npm.cmd run check` passed: 257 tests and production build. Live routing benchmark 16-08 remains open because Docker, Valhalla, and the local web server were unavailable in this environment. See docs/progress/phase-16-shape-match-improvements.md.
-- 2026-11-16: Broadened area search after user reported worse shape matches: up to 48 deterministic placements and eight full-detail refinements, with workspace limits raised to 512 routing calls and 60 seconds. Targeted and full checks pending. Live quality comparison still requires local Valhalla and app services.
+- 2026-11-16: Broadened area search after user reported worse shape matches: up to 48 deterministic placements and eight full-detail refinements, with workspace limits raised to 512 routing calls and 35 seconds. The Vercel function has a 60-second limit to return results after the search budget. Full checks passed (258 tests and production build); live quality comparison still requires local Valhalla and app services.
 
 - 2026-11-10: Completed 09-07. Added a downloadable PNG route card with selected geometry, route stats, escaped title, and OSM attribution. It does not receive the private sketch. Full `npm run check` passed: 239 tests and production build. See docs/progress/phase-09-07-shareable-route-image.md.
 

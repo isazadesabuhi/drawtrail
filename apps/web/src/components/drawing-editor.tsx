@@ -306,7 +306,7 @@ function DrawingSession({
                     radiusMeters: routeSettings.searchRadiusMeters,
                     candidateCount: 48,
                     ...(areaOnly ? { routeWithinRadius: true } : {}),
-                    maxRuntimeMs: 60_000,
+                    maxRuntimeMs: 35_000,
                     maxRouterRequests: 512,
                     ...(routeSettings.maxDistanceDeviationPercent === null ||
                     routeSettings.bestShapeMatch

@@ -732,7 +732,7 @@ describe('map workspace with a mocked renderer', () => {
           radiusMeters: 2000,
           candidateCount: 48,
           maxDistanceDeviationRatio: 0.4,
-          maxRuntimeMs: 60000,
+          maxRuntimeMs: 35000,
           maxRouterRequests: 512,
         },
       },
