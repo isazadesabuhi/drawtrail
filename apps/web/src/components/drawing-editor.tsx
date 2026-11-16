@@ -258,6 +258,7 @@ function DrawingSession({
         body: JSON.stringify({
           drawing: { ...drawing, strokes: [selected] },
           center: startPoint,
+          ...(!areaOnly ? { requiredWaypoint: startPoint } : {}),
           mode: routeSettings.mode,
           ...(routeSettings.bestShapeMatch
             ? {}
@@ -284,6 +285,8 @@ function DrawingSession({
           settings: {
             // More control points keep routed streets closer to bends in the sketch.
             maxWaypoints: 16,
+            distanceFlexibilityRatio:
+              Number(routeSettings.distanceFlexibilityPercent) / 100,
             seed: `${drawing.name}:${selected.id}:${placementIndex}`,
             preferences: {
               hills: routeSettings.hills,
@@ -301,7 +304,7 @@ function DrawingSession({
               : {
                   searchArea: {
                     radiusMeters: routeSettings.searchRadiusMeters,
-                    candidateCount: areaOnly ? 16 : 8,
+                    candidateCount: 16,
                     ...(areaOnly ? { routeWithinRadius: true } : {}),
                     maxRuntimeMs: 30_000,
                     maxRouterRequests: 160,

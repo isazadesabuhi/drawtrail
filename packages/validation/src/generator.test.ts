@@ -24,6 +24,21 @@ describe('route generation contracts', () => {
     });
   });
 
+  it('defaults omitted distance flexibility to ten percent and rejects larger ranges', async () => {
+    const fixture = (await readFixture('generator-request.json')) as {
+      settings: Record<string, unknown>;
+    };
+    delete fixture.settings.distanceFlexibilityRatio;
+    const parsed = routeGenerationRequestSchema.parse(fixture);
+    expect(parsed.settings.distanceFlexibilityRatio).toBe(0.1);
+    expect(
+      routeGenerationRequestSchema.safeParse({
+        ...parsed,
+        settings: { ...parsed.settings, distanceFlexibilityRatio: 0.25 },
+      }).success,
+    ).toBe(false);
+  });
+
   it('validates route preferences while accepting older requests without them', async () => {
     const request = routeGenerationRequestSchema.parse(
       await readFixture('generator-request.json'),

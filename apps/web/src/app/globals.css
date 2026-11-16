@@ -1890,6 +1890,13 @@ footer p {
 .target-legend-swatch {
   background: #d27143;
 }
+.deviation-legend-swatch {
+  background: repeating-linear-gradient(
+    90deg,
+    #a94d66 0 4px,
+    transparent 4px 7px
+  );
+}
 .search-area-legend-swatch {
   background: repeating-linear-gradient(
     90deg,

@@ -89,12 +89,170 @@ class SearchBudgetError extends Error {
   }
 }
 
+type DrawingWaypoint = { point: LngLat; alongMeters: number };
+
+function distanceAlongLine(
+  line: GeoJSONLineString,
+  coordinate: LngLat,
+  anchor: LngLat,
+) {
+  const metric = line.coordinates.map((point) => projectLngLat(point, anchor));
+  const target = projectLngLat(coordinate, anchor);
+  let alongMeters = 0;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  let closestAlong = 0;
+  for (let index = 0; index < metric.length - 1; index++) {
+    const first = metric[index]!;
+    const second = metric[index + 1]!;
+    const deltaEast = second[0] - first[0];
+    const deltaNorth = second[1] - first[1];
+    const lengthSquared = deltaEast ** 2 + deltaNorth ** 2;
+    const length = Math.sqrt(lengthSquared);
+    const fraction =
+      lengthSquared === 0
+        ? 0
+        : Math.max(
+            0,
+            Math.min(
+              1,
+              ((target[0] - first[0]) * deltaEast +
+                (target[1] - first[1]) * deltaNorth) /
+                lengthSquared,
+            ),
+          );
+    const distance = Math.hypot(
+      target[0] - (first[0] + deltaEast * fraction),
+      target[1] - (first[1] + deltaNorth * fraction),
+    );
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestAlong = alongMeters + length * fraction;
+    }
+    alongMeters += length;
+  }
+  return closestAlong;
+}
+
+/** Find separated local maxima where the routed path strays from the sketch. */
+function findDrawingDeviationWaypoints(
+  target: GeoJSONLineString,
+  route: GeoJSONLineString,
+  anchor: LngLat,
+): DrawingWaypoint[] {
+  const targetPoints = target.coordinates.map((point) =>
+    projectLngLat(point, anchor),
+  );
+  const routePoints = route.coordinates.map((point) =>
+    projectLngLat(point, anchor),
+  );
+  const lengths: number[] = [0];
+  for (let index = 0; index < targetPoints.length - 1; index++) {
+    const first = targetPoints[index]!;
+    const second = targetPoints[index + 1]!;
+    lengths.push(
+      lengths[index]! + Math.hypot(second[0] - first[0], second[1] - first[1]),
+    );
+  }
+  const totalLength = lengths.at(-1)!;
+  if (totalLength < 1 || routePoints.length < 2) return [];
+  const sampleCount = 128;
+  const errors = Array.from({ length: sampleCount }, (_, sampleIndex) => {
+    const alongMeters = (totalLength * sampleIndex) / (sampleCount - 1);
+    let segmentIndex = lengths.findIndex((length) => length >= alongMeters) - 1;
+    segmentIndex = Math.max(0, Math.min(targetPoints.length - 2, segmentIndex));
+    const first = targetPoints[segmentIndex]!;
+    const second = targetPoints[segmentIndex + 1]!;
+    const segmentLength = lengths[segmentIndex + 1]! - lengths[segmentIndex]!;
+    const fraction =
+      segmentLength === 0
+        ? 0
+        : (alongMeters - lengths[segmentIndex]!) / segmentLength;
+    const point: [number, number] = [
+      first[0] + (second[0] - first[0]) * fraction,
+      first[1] + (second[1] - first[1]) * fraction,
+    ];
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (
+      let routeIndex = 0;
+      routeIndex < routePoints.length - 1;
+      routeIndex++
+    ) {
+      const routeStart = routePoints[routeIndex]!;
+      const routeEnd = routePoints[routeIndex + 1]!;
+      const east = routeEnd[0] - routeStart[0];
+      const north = routeEnd[1] - routeStart[1];
+      const segmentLengthSquared = east ** 2 + north ** 2;
+      const routeFraction =
+        segmentLengthSquared === 0
+          ? 0
+          : Math.max(
+              0,
+              Math.min(
+                1,
+                ((point[0] - routeStart[0]) * east +
+                  (point[1] - routeStart[1]) * north) /
+                  segmentLengthSquared,
+              ),
+            );
+      nearestDistance = Math.min(
+        nearestDistance,
+        Math.hypot(
+          point[0] - (routeStart[0] + east * routeFraction),
+          point[1] - (routeStart[1] + north * routeFraction),
+        ),
+      );
+    }
+    return { point, alongMeters, deviationMeters: nearestDistance };
+  });
+  const east = targetPoints.map(([value]) => value);
+  const north = targetPoints.map(([, value]) => value);
+  const diagonal = Math.hypot(
+    Math.max(...east) - Math.min(...east),
+    Math.max(...north) - Math.min(...north),
+  );
+  const thresholdMeters = Math.max(15, diagonal * 0.01);
+  const minimumSpacingMeters = Math.max(100, totalLength * 0.08);
+  const maxima = errors
+    .filter((sample, index) => {
+      if (index < 2 || index >= errors.length - 2) return false;
+      const previous = errors[index - 1]!;
+      const next = errors[index + 1]!;
+      return (
+        sample.deviationMeters >= thresholdMeters &&
+        sample.deviationMeters >= previous.deviationMeters &&
+        sample.deviationMeters >= next.deviationMeters
+      );
+    })
+    .sort((first, second) => second.deviationMeters - first.deviationMeters);
+  const selected: DrawingWaypoint[] = [];
+  for (const sample of maxima) {
+    if (
+      selected.some(
+        (waypoint) =>
+          Math.abs(waypoint.alongMeters - sample.alongMeters) <
+          minimumSpacingMeters,
+      )
+    ) {
+      continue;
+    }
+    selected.push({
+      point: unprojectEastNorth(sample.point, anchor),
+      alongMeters: sample.alongMeters,
+    });
+    if (selected.length === 4) break;
+  }
+  return selected.sort(
+    (first, second) => first.alongMeters - second.alongMeters,
+  );
+}
+
 /** Route one ordered stroke segment-by-segment, never inventing a connector. */
 async function generateSingleRoute(
   request: RouteGenerationRequest,
   routeSegment: RouteSegmenter,
   signal?: AbortSignal,
   shapeDistanceKm = request.targetDistanceKm ?? 3,
+  extraWaypoints: readonly DrawingWaypoint[] = [],
 ): Promise<RouteGenerationResponse> {
   if (request.drawing.strokes.length !== 1) {
     return failure(
@@ -139,6 +297,26 @@ async function generateSingleRoute(
       request.center,
       request.settings.maxWaypoints,
     );
+    if (extraWaypoints.length) {
+      waypoints = [
+        ...waypoints.map((point) => ({
+          point,
+          alongMeters: distanceAlongLine(target, point, request.center),
+        })),
+        ...extraWaypoints,
+      ]
+        .sort((first, second) => first.alongMeters - second.alongMeters)
+        .reduce<LngLat[]>((result, item) => {
+          const previous = result.at(-1);
+          if (
+            !previous ||
+            distanceMeters(previous, item.point, request.center) > 1
+          ) {
+            result.push(item.point);
+          }
+          return result;
+        }, []);
+    }
   } catch (error) {
     return failure('invalid_drawing', (error as Error).message);
   }
@@ -171,17 +349,27 @@ async function generateSingleRoute(
   }
 
   const segments: Array<[LngLat, LngLat, number]> = [];
+  const requiredWaypoint = request.requiredWaypoint;
+  const needsStartConnector =
+    requiredWaypoint !== undefined &&
+    distanceMeters(requiredWaypoint, waypoints[0]!, request.center) > 1;
+  if (needsStartConnector) {
+    segments.push([requiredWaypoint!, waypoints[0]!, -1]);
+  }
   for (let index = 0; index < waypoints.length - 1; index++) {
     segments.push([waypoints[index]!, waypoints[index + 1]!, index]);
   }
   if (closedLoop) {
     segments.push([waypoints.at(-1)!, waypoints[0]!, waypoints.length - 1]);
+    if (needsStartConnector) {
+      segments.push([waypoints[0]!, requiredWaypoint!, waypoints.length]);
+    }
   }
 
   const routeCoordinates: LngLat[] = [];
   let distance = 0;
   let maximumSnapDistanceMeters = 0;
-  for (const [from, to, waypointIndex] of segments) {
+  for (const [segmentIndex, [from, to, waypointIndex]] of segments.entries()) {
     if (signal?.aborted)
       return failure(
         'cancelled',
@@ -227,6 +415,17 @@ async function generateSingleRoute(
       distanceMeters(coordinates[0]!, from, request.center),
       distanceMeters(coordinates.at(-1)!, to, request.center),
     );
+    if (
+      requiredWaypoint &&
+      segmentIndex === 0 &&
+      distanceMeters(coordinates[0]!, requiredWaypoint, request.center) > 250
+    ) {
+      return failure(
+        'infeasible_waypoint',
+        'The selected start point is more than 250 m from a routeable street. Move the pin closer to a mapped path.',
+        waypointIndex,
+      );
+    }
     const previous = routeCoordinates.at(-1);
     if (
       previous &&
@@ -318,6 +517,9 @@ async function generateSingleRoute(
     distanceMeters: distance,
     requestedDistanceMeters,
     similarityScore: Math.max(0, similarity.score - snapPenalty),
+    averageDeviationMeters: similarity.averageDeviationMeters,
+    p95DeviationMeters: similarity.p95DeviationMeters,
+    maximumDeviationMeters: similarity.maximumDeviationMeters,
     retracingMeters: retracing.repeatedMeters,
     waypointCount: waypoints.length,
     warnings,
@@ -383,24 +585,70 @@ export async function generateRoute(
 ): Promise<RouteGenerationResponse> {
   const searchArea = request.settings.searchArea;
   const unconstrainedDistance = request.targetDistanceKm === undefined;
-  if (!searchArea && !unconstrainedDistance)
-    return addRouteElevation(
-      await generateSingleRoute(request, routeSegment, signal),
-      elevationLookup,
-      signal,
+  const distanceFlexibility = request.settings.distanceFlexibilityRatio;
+  if (!searchArea && !unconstrainedDistance && distanceFlexibility === 0) {
+    const initial = await generateSingleRoute(request, routeSegment, signal);
+    if (initial.status !== 'success')
+      return addRouteElevation(initial, elevationLookup, signal);
+    const extraWaypoints = findDrawingDeviationWaypoints(
+      initial.targetGeometry,
+      initial.route.geometry,
+      request.center,
     );
+    if (!extraWaypoints.length)
+      return addRouteElevation(initial, elevationLookup, signal);
+    const refined = await generateSingleRoute(
+      request,
+      routeSegment,
+      signal,
+      request.targetDistanceKm,
+      extraWaypoints,
+    );
+    if (
+      refined.status === 'success' &&
+      refined.similarityScore > initial.similarityScore + 0.005
+    ) {
+      return addRouteElevation(
+        {
+          ...refined,
+          warnings: [
+            ...refined.warnings,
+            `Shape fit improved after adding ${extraWaypoints.length} waypoints at the largest drawing gaps.`,
+          ],
+        },
+        elevationLookup,
+        signal,
+      );
+    }
+    return addRouteElevation(initial, elevationLookup, signal);
+  }
 
-  const candidateCount = searchArea?.candidateCount ?? 6;
+  const distanceOffsets = [
+    0,
+    -distanceFlexibility,
+    distanceFlexibility,
+    -distanceFlexibility / 2,
+    distanceFlexibility / 2,
+  ];
+  const candidateCount =
+    searchArea?.candidateCount ?? (unconstrainedDistance ? 6 : 5);
   const searchRadiusMeters = searchArea?.radiusMeters ?? 0;
 
   let placements: ReturnType<typeof searchPlacements>;
   try {
-    placements = searchPlacements(
-      request.center,
-      searchRadiusMeters,
-      candidateCount,
-      request.settings.seed,
-    );
+    placements =
+      !searchArea && !unconstrainedDistance
+        ? Array.from({ length: candidateCount }, () => ({
+            center: request.center,
+            rotationDegrees: request.settings.placement.rotationDegrees,
+            scale: request.settings.placement.scale,
+          }))
+        : searchPlacements(
+            request.center,
+            searchRadiusMeters,
+            candidateCount,
+            request.settings.seed,
+          );
   } catch (error) {
     return failure(
       'infeasible_waypoint',
@@ -413,7 +661,9 @@ export async function generateRoute(
   const maxRuntimeMs = searchArea?.maxRuntimeMs ?? 30_000;
   const maxRouterRequests =
     searchArea?.maxRouterRequests ??
-    candidateCount * (request.settings.maxWaypoints + 1);
+    candidateCount *
+      (request.settings.maxWaypoints +
+        (request.requiredWaypoint && request.loop ? 2 : 1));
   let routerRequests = 0;
   let budgetMessage: string | undefined;
   const boundedRouter: RouteSegmenter = async (
@@ -444,6 +694,8 @@ export async function generateRoute(
     score: number;
     request: RouteGenerationRequest;
     shapeDistanceKm: number;
+    adaptiveWaypoints: number;
+    detailedRefinement: boolean;
   }> = [];
   const scoreCandidate = (candidate: RouteGenerationSuccess) => {
     const relativeDistanceError =
@@ -503,8 +755,12 @@ export async function generateRoute(
           ...request.settings.placement,
           rotationDegrees: placement.rotationDegrees,
           scale: placement.scale,
-          offsetEastMeters: 0,
-          offsetNorthMeters: 0,
+          offsetEastMeters: searchArea
+            ? 0
+            : request.settings.placement.offsetEastMeters,
+          offsetNorthMeters: searchArea
+            ? 0
+            : request.settings.placement.offsetNorthMeters,
         },
       },
     };
@@ -512,13 +768,20 @@ export async function generateRoute(
       ? unconstrainedShapeDistancesKm[
           placementIndex % unconstrainedShapeDistancesKm.length
         ]!
-      : request.targetDistanceKm!;
-    const coarseRequest = searchArea?.routeWithinRadius
+      : Math.max(
+          0.2,
+          Math.min(
+            20,
+            request.targetDistanceKm! *
+              (1 + distanceOffsets[placementIndex % distanceOffsets.length]!),
+          ),
+        );
+    const coarseRequest = searchArea
       ? {
           ...candidateRequest,
           settings: {
             ...candidateRequest.settings,
-            maxWaypoints: Math.min(6, candidateRequest.settings.maxWaypoints),
+            maxWaypoints: Math.min(4, candidateRequest.settings.maxWaypoints),
           },
         }
       : candidateRequest;
@@ -567,12 +830,14 @@ export async function generateRoute(
       score: scoreCandidate(candidate),
       request: candidateRequest,
       shapeDistanceKm,
+      adaptiveWaypoints: 0,
+      detailedRefinement: false,
     });
   }
 
-  // Spend remaining search budget on the best area-only placements with the
-  // full waypoint count before presenting alternatives.
-  if (searchArea?.routeWithinRadius && ranked.length > 0) {
+  // Refine the leading candidates: area-only search first restores full
+  // waypoint detail, then every search mode targets its largest shape gaps.
+  if (ranked.length > 0) {
     ranked.sort(
       (first, second) =>
         second.score - first.score ||
@@ -587,11 +852,38 @@ export async function generateRoute(
         budgetMessage = `Search stopped at its ${Math.round(maxRuntimeMs / 1000)}-second time limit.`;
         break;
       }
+      if (searchArea) {
+        const detailed = await generateSingleRoute(
+          item.request,
+          boundedRouter,
+          signal,
+          item.shapeDistanceKm,
+        );
+        if (detailed.status === 'error') {
+          if (detailed.code === 'optimization_budget') {
+            budgetMessage = detailed.message;
+            break;
+          }
+          if (detailed.code === 'cancelled') return detailed;
+          continue;
+        }
+        if (!fitsArea(detailed) || violatesDistanceLimit(detailed)) continue;
+        item.result = detailed;
+        item.score = scoreCandidate(detailed);
+        item.detailedRefinement = true;
+      }
+      const extraWaypoints = findDrawingDeviationWaypoints(
+        item.result.targetGeometry,
+        item.result.route.geometry,
+        item.request.center,
+      );
+      if (!extraWaypoints.length) continue;
       const refined = await generateSingleRoute(
         item.request,
         boundedRouter,
         signal,
         item.shapeDistanceKm,
+        extraWaypoints,
       );
       if (refined.status === 'error') {
         if (refined.code === 'optimization_budget') {
@@ -602,8 +894,18 @@ export async function generateRoute(
         continue;
       }
       if (!fitsArea(refined) || violatesDistanceLimit(refined)) continue;
-      item.result = refined;
-      item.score = scoreCandidate(refined);
+      const refinedScore = scoreCandidate(refined);
+      if (refinedScore > item.score + 0.005) {
+        item.result = {
+          ...refined,
+          warnings: [
+            ...refined.warnings,
+            `Shape fit improved after adding ${extraWaypoints.length} waypoints at the largest drawing gaps.`,
+          ],
+        };
+        item.score = refinedScore;
+        item.adaptiveWaypoints = extraWaypoints.length;
+      }
     }
   }
 
@@ -625,7 +927,10 @@ export async function generateRoute(
         alternative.route.geometry,
         request.center,
       ).score;
-      return Math.min(forward, backward) >= 0.92;
+      const lengthDifference =
+        Math.abs(alternative.distanceMeters - item.result.distanceMeters) /
+        Math.max(alternative.distanceMeters, item.result.distanceMeters);
+      return Math.min(forward, backward) >= 0.92 && lengthDifference <= 0.03;
     });
     if (isDuplicate) continue;
     alternatives.push({
@@ -634,6 +939,9 @@ export async function generateRoute(
       route: item.result.route,
       distanceMeters: item.result.distanceMeters,
       similarityScore: item.result.similarityScore,
+      averageDeviationMeters: item.result.averageDeviationMeters,
+      p95DeviationMeters: item.result.p95DeviationMeters,
+      maximumDeviationMeters: item.result.maximumDeviationMeters,
       retracingMeters: item.result.retracingMeters,
       score: item.score,
       waypointCount: item.result.waypointCount,
@@ -643,18 +951,25 @@ export async function generateRoute(
   }
   const best = alternatives[0];
   if (best) {
+    const bestItem = ranked.find((item) => item.result.route === best.route)!;
+    const detailedRefinements = ranked.filter(
+      (item) => item.detailedRefinement,
+    ).length;
     const warnings = [
       ...best.warnings,
-      searchArea?.routeWithinRadius
-        ? `Best of ${ranked.length} viable placements sampled inside the ${(searchArea.radiusMeters / 1000).toFixed(1)} km radius; top placements were refined using more drawing points.`
-        : searchArea
-          ? `Best of ${ranked.length} viable placements searched within a ${(searchArea.radiusMeters / 1000).toFixed(1)} km radius.`
-          : `Best shape match of ${ranked.length} viable route sizes at the selected map pin.`,
+      searchArea
+        ? `Best of ${ranked.length} viable placements sampled within a ${(searchArea.radiusMeters / 1000).toFixed(1)} km radius; ${detailedRefinements} leading placements were rerouted with more drawing points.`
+        : `Best shape match of ${ranked.length} viable route sizes at the selected map pin.`,
     ];
     if (budgetMessage) warnings.push(budgetMessage);
+    if (bestItem.adaptiveWaypoints > 0) {
+      warnings.push(
+        `Shape fit was refined with ${bestItem.adaptiveWaypoints} extra waypoints at the largest drawing gaps.`,
+      );
+    }
     return addRouteElevation(
       {
-        ...ranked.find((item) => item.result.route === best.route)!.result,
+        ...bestItem.result,
         warnings,
         alternatives,
       },

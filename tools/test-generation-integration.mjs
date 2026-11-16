@@ -41,6 +41,7 @@ for (const fixture of routingFixtures) {
 }
 assert(selectedRegion, 'No supported Lyon or Andorra routing graph is loaded.');
 requestBody.center = selectedRegion.center;
+requestBody.requiredWaypoint = selectedRegion.center;
 requestBody.bounds.radiusMeters = 5000;
 requestBody.settings.searchArea = {
   radiusMeters: 500,
@@ -78,7 +79,7 @@ assert(
 );
 assert(
   generation.waypointCount >= 2 &&
-    generation.waypointCount <= requestBody.settings.maxWaypoints,
+    generation.waypointCount <= requestBody.settings.maxWaypoints + 4,
 );
 
 const [startLongitude, startLatitude] =
@@ -96,13 +97,36 @@ const arc =
     Math.sin(longitudeDelta / 2) ** 2;
 const closureMeters =
   earthRadiusMeters * 2 * Math.atan2(Math.sqrt(arc), Math.sqrt(1 - arc));
+const startSnapMeters = (() => {
+  const startLatitudeRadians = radians(startLatitude);
+  const latitudeDifference = radians(
+    startLatitude - requestBody.requiredWaypoint[1],
+  );
+  const longitudeDifference = radians(
+    startLongitude - requestBody.requiredWaypoint[0],
+  );
+  const startArc =
+    Math.sin(latitudeDifference / 2) ** 2 +
+    Math.cos(startLatitudeRadians) *
+      Math.cos(radians(requestBody.requiredWaypoint[1])) *
+      Math.sin(longitudeDifference / 2) ** 2;
+  return (
+    earthRadiusMeters *
+    2 *
+    Math.atan2(Math.sqrt(startArc), Math.sqrt(1 - startArc))
+  );
+})();
 assert(
   closureMeters <= requestBody.bounds.continuityToleranceMeters + 1,
   `Closed baseline ended ${closureMeters.toFixed(1)} m from its start.`,
 );
+assert(
+  startSnapMeters <= 250,
+  `Route start snapped ${startSnapMeters.toFixed(1)} m from the selected point.`,
+);
 
 console.log(
-  `PASS ${selectedRegion.name} heart baseline: ${(generation.distanceMeters / 1000).toFixed(2)} km, ${Math.round(generation.similarityScore * 100)}% similarity, ${generation.waypointCount} ordered waypoints, ${closureMeters.toFixed(1)} m loop gap.`,
+  `PASS ${selectedRegion.name} heart baseline: ${(generation.distanceMeters / 1000).toFixed(2)} km, ${Math.round(generation.similarityScore * 100)}% estimated fit, ${generation.averageDeviationMeters.toFixed(1)} m average gap, ${generation.p95DeviationMeters.toFixed(1)} m p95 gap, ${generation.waypointCount} waypoints, ${startSnapMeters.toFixed(1)} m from pinned start, ${closureMeters.toFixed(1)} m loop gap.`,
 );
 if (generation.warnings.length) {
   console.log(`Route warnings: ${generation.warnings.join(' ')}`);

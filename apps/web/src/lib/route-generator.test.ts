@@ -112,6 +112,73 @@ describe('route generator', () => {
     expect(firstRequest[1]).toEqual(result.targetGeometry.coordinates[0]);
   });
 
+  it('starts at a required map waypoint and closes loops back to that waypoint', async () => {
+    const request = await readRequest();
+    request.bounds.radiusMeters = 25_000;
+    request.requiredWaypoint = [anchor[0], anchor[1]];
+    const router = vi.fn(fixtureRouter());
+
+    const result = await generateRoute(request, router);
+
+    expect(result.status).toBe('success');
+    if (result.status !== 'success') return;
+    expect(router.mock.calls[0]?.[1]).toEqual(anchor);
+    expect(result.route.geometry.coordinates[0]).toEqual(anchor);
+    expect(result.route.geometry.coordinates.at(-1)).toEqual(anchor);
+  });
+
+  it('rejects a required start point that snaps more than 250 m from the pin', async () => {
+    const request = await readRequest();
+    request.bounds.radiusMeters = 25_000;
+    request.requiredWaypoint = [anchor[0], anchor[1]];
+    const distantRoad: RouteSegmenter = async (mode, from, to) => {
+      const coordinates: LngLat[] = [
+        [from[0] + 0.01, from[1]],
+        [to[0] + 0.01, to[1]],
+      ];
+      return {
+        mode,
+        geometry: { type: 'LineString', coordinates },
+        distanceMeters: lineLengthMeters(
+          { type: 'LineString', coordinates },
+          anchor,
+        ),
+      };
+    };
+
+    await expect(generateRoute(request, distantRoad)).resolves.toMatchObject({
+      status: 'error',
+      code: 'infeasible_waypoint',
+      message: expect.stringContaining('more than 250 m'),
+    });
+  });
+
+  it('adds waypoints at a large sketch miss and reroutes the affected section', async () => {
+    const request = await readRequest();
+    request.bounds.radiusMeters = 25_000;
+    request.loop = false;
+    request.drawing.strokes[0]!.closed = false;
+    request.drawing.strokes[0]!.points = [
+      [0.1, 0.5],
+      [0.5, 0.1],
+      [0.9, 0.5],
+    ];
+    request.settings.maxWaypoints = 2;
+    const router = vi.fn(fixtureRouter());
+
+    const result = await generateRoute(request, router);
+
+    expect(result.status).toBe('success');
+    if (result.status !== 'success') return;
+    expect(router).toHaveBeenCalledTimes(3);
+    expect(result.waypointCount).toBe(3);
+    expect(
+      result.warnings.some((warning) =>
+        warning.includes('largest drawing gaps'),
+      ),
+    ).toBe(true);
+  });
+
   it('warns and lowers the score when road snapping pulls the route off the sketch', async () => {
     const request = await readRequest();
     request.bounds.radiusMeters = 25_000;
@@ -202,9 +269,13 @@ describe('route generator', () => {
     expect(result.status).toBe('success');
     if (result.status !== 'success') return;
     expect(result.requestedDistanceMeters).toBeNull();
-    expect(result.warnings).toContain(
-      'Best of 2 viable placements searched within a 1.0 km radius.',
-    );
+    expect(
+      result.warnings.some((warning) =>
+        /Best of 2 viable placements sampled within a 1\.0 km radius; \d+ leading placements were rerouted with more drawing points\./.test(
+          warning,
+        ),
+      ),
+    ).toBe(true);
   });
 
   it('requires every routed coordinate to stay inside an area-only radius', async () => {
@@ -329,12 +400,16 @@ describe('route generator', () => {
 
     expect(result.status).toBe('success');
     if (result.status !== 'success') return;
-    expect(result.warnings).toContain(
-      'Best of 2 viable placements searched within a 2.0 km radius.',
-    );
+    expect(
+      result.warnings.some((warning) =>
+        /Best of 2 viable placements sampled within a 2\.0 km radius; \d+ leading placements were rerouted with more drawing points\./.test(
+          warning,
+        ),
+      ),
+    ).toBe(true);
     expect(result.alternatives?.[0]?.route).toEqual(result.route);
     expect(result.alternatives?.length).toBeLessThanOrEqual(3);
-    expect(callCount).toBe(1 + result.waypointCount * 2);
+    expect(callCount).toBeGreaterThan(9);
     expect(result.targetGeometry.coordinates[0]).not.toEqual(
       fixed.targetGeometry.coordinates[0],
     );
@@ -391,6 +466,37 @@ describe('route generator', () => {
     expect(targetLength).toBeCloseTo(2400, -1);
   });
 
+  it('returns shorter and longer route alternatives within the selected distance flexibility', async () => {
+    const request = await readRequest();
+    request.bounds.radiusMeters = 25_000;
+    request.settings.distanceFlexibilityRatio = 0.2;
+    const progress = vi.fn();
+
+    const result = await generateRoute(
+      request,
+      fixtureRouter(),
+      undefined,
+      progress,
+    );
+
+    expect(result.status).toBe('success');
+    if (result.status !== 'success') return;
+    expect(progress).toHaveBeenCalledTimes(5);
+    const alternatives = result.alternatives ?? [];
+    expect(alternatives.length).toBeGreaterThanOrEqual(3);
+    expect(alternatives.some((route) => route.distanceMeters < 3000)).toBe(
+      true,
+    );
+    expect(alternatives.some((route) => route.distanceMeters > 3000)).toBe(
+      true,
+    );
+    expect(
+      alternatives.every(
+        (route) => route.distanceMeters >= 2400 && route.distanceMeters <= 3600,
+      ),
+    ).toBe(true);
+  });
+
   it('returns a typed failure for area searches beyond the projection latitude limit', async () => {
     const request = await readRequest();
     request.center = [1.5, 89];
@@ -417,7 +523,7 @@ describe('route generator', () => {
     const router: RouteSegmenter = async (mode, from, to) => ({
       mode,
       geometry: { type: 'LineString', coordinates: [from, to] },
-      distanceMeters: 1000,
+      distanceMeters: 5000,
     });
 
     await expect(generateRoute(request, router)).resolves.toMatchObject({

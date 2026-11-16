@@ -165,7 +165,7 @@ function enterCoordinates(latitude: string, longitude: string) {
   fireEvent.change(screen.getByLabelText('Longitude', { exact: true }), {
     target: { value: longitude },
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Set start point' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Set route start' }));
 }
 function enterRouteOptions() {
   fireEvent.click(screen.getByRole('button', { name: 'Set route options' }));
@@ -281,12 +281,15 @@ describe('map workspace with a mocked renderer', () => {
     act(() => map.emit('load'));
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Find a route inside an area instead',
+        name: 'Search for a route inside an area instead',
       }),
     );
     expect(
       screen.getByLabelText('Search area center', { selector: 'output' }),
     ).toHaveTextContent('Click the map to choose the search area center.');
+    expect(
+      screen.getByRole('heading', { name: 'Choose a search area.' }),
+    ).toBeVisible();
     act(() => map.emit('click', [4.84, 45.77]));
     expect(
       screen.getByLabelText('Search area center', { selector: 'output' }),
@@ -305,7 +308,7 @@ describe('map workspace with a mocked renderer', () => {
     expect(screen.getByLabelText('Maximum route radius (km)')).toHaveValue(5);
     expect(screen.getByText(/keep the whole route inside it/i)).toBeVisible();
     expect(
-      screen.queryByLabelText('Search around my starting point'),
+      screen.queryByLabelText('Search nearby shape placements'),
     ).toBeNull();
     continueToDrawing();
     fireEvent.click(screen.getByRole('button', { name: 'Heart' }));
@@ -318,6 +321,7 @@ describe('map workspace with a mocked renderer', () => {
       center: [4.84, 45.77],
       settings: {
         maxWaypoints: 16,
+        distanceFlexibilityRatio: 0.1,
         searchArea: {
           radiusMeters: 5000,
           candidateCount: 16,
@@ -325,6 +329,7 @@ describe('map workspace with a mocked renderer', () => {
         },
       },
     });
+    expect(request).not.toHaveProperty('requiredWaypoint');
   });
 
   it('shows the basic draw controls first and keeps advanced tools collapsed', async () => {
@@ -335,8 +340,21 @@ describe('map workspace with a mocked renderer', () => {
     enterRouteOptions();
     expect(screen.getByLabelText('Activity')).toBeVisible();
     expect(screen.getByLabelText('Target distance (km)')).toBeVisible();
+    expect(screen.getByLabelText('Target distance (km)')).toHaveAttribute(
+      'max',
+      '20',
+    );
+    expect(screen.getByLabelText('Try routes within')).toHaveValue('10');
     expect(
-      screen.getByLabelText('Search around my starting point'),
+      screen.getByLabelText('Search nearby shape placements'),
+    ).toBeVisible();
+    expect(
+      screen.getAllByText(
+        /optional radius searches for better shape placements around it/i,
+      ),
+    ).toHaveLength(2);
+    expect(
+      screen.getByText(/route starts on a routeable street within 250 m/i),
     ).toBeVisible();
     expect(screen.getByLabelText('Hill preference')).not.toBeVisible();
     expect(screen.getByText('More options').closest('details')).toHaveProperty(
@@ -379,6 +397,10 @@ describe('map workspace with a mocked renderer', () => {
       'drawtrail-search-area',
       expect.objectContaining({ type: 'geojson' }),
     );
+    expect(map.addSource).toHaveBeenCalledWith(
+      'drawtrail-worst-gap',
+      expect.objectContaining({ type: 'geojson' }),
+    );
     expect(map.addLayer).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'drawtrail-route-line',
@@ -389,6 +411,12 @@ describe('map workspace with a mocked renderer', () => {
       expect.objectContaining({
         id: 'drawtrail-target-line',
         source: 'drawtrail-target-geometry',
+      }),
+    );
+    expect(map.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'drawtrail-worst-gap-line',
+        source: 'drawtrail-worst-gap',
       }),
     );
     expect(
@@ -582,10 +610,11 @@ describe('map workspace with a mocked renderer', () => {
     act(() => map.emit('load'));
     enterCoordinates('45.77', '4.84');
     enterRouteOptions();
-    fireEvent.click(screen.getByLabelText('Search around my starting point'));
-    expect(screen.getByLabelText('Search radius from start (km)')).toHaveValue(
-      2,
-    );
+    fireEvent.change(screen.getByLabelText('Try routes within'), {
+      target: { value: '20' },
+    });
+    fireEvent.click(screen.getByLabelText('Search nearby shape placements'));
+    expect(screen.getByLabelText('Shape search radius (km)')).toHaveValue(2);
     expect(
       engine.sources.get('drawtrail-search-area')?.setData,
     ).toHaveBeenLastCalledWith(
@@ -622,6 +651,21 @@ describe('map workspace with a mocked renderer', () => {
     fireEvent.click(screen.getByText('Route details'));
     expect(screen.getByText('82%')).toBeVisible();
     expect(screen.getByText('30 m')).toBeVisible();
+    expect(screen.getByText('Average gap from drawing')).toBeVisible();
+    expect(screen.getByText('95th-percentile gap')).toBeVisible();
+    expect(screen.getByLabelText('Map geometry legend')).toHaveTextContent(
+      'Largest shape gap',
+    );
+    expect(
+      engine.sources.get('drawtrail-worst-gap')?.setData,
+    ).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: 'FeatureCollection',
+        features: [
+          expect.objectContaining({ properties: { kind: 'worst-gap' } }),
+        ],
+      }),
+    );
     expect(
       screen.getByRole('img', { name: 'Route elevation profile' }),
     ).toBeVisible();
@@ -677,14 +721,16 @@ describe('map workspace with a mocked renderer', () => {
     const request = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body));
     expect(request).toMatchObject({
       center: [4.84, 45.77],
+      requiredWaypoint: [4.84, 45.77],
       mode: 'walking',
       targetDistanceKm: 3,
       loop: true,
       settings: {
         maxWaypoints: 16,
+        distanceFlexibilityRatio: 0.2,
         searchArea: {
           radiusMeters: 2000,
-          candidateCount: 8,
+          candidateCount: 16,
           maxDistanceDeviationRatio: 0.4,
           maxRuntimeMs: 30000,
           maxRouterRequests: 160,
@@ -838,7 +884,7 @@ describe('map workspace with a mocked renderer', () => {
     render(<MapWorkspace configuration={configuration} />);
     const map = await mountedMap();
     act(() => map.emit('click', [4.84, 45.77]));
-    expect(screen.getByLabelText('Selected start point')).toHaveTextContent(
+    expect(screen.getByLabelText('Selected route start')).toHaveTextContent(
       '45.770000° N, 4.840000° E',
     );
     expect(screen.getByText('[4.840000, 45.770000]')).toBeVisible();
@@ -856,7 +902,7 @@ describe('map workspace with a mocked renderer', () => {
       bearing: 0,
       pitch: 0,
     });
-    expect(screen.getByLabelText('Selected start point')).toHaveTextContent(
+    expect(screen.getByLabelText('Selected route start')).toHaveTextContent(
       '45.780000° N, 4.850000° E',
     );
   });
@@ -864,7 +910,7 @@ describe('map workspace with a mocked renderer', () => {
   it('accepts WGS84 coordinates anywhere and rejects invalid coordinates without losing a valid start', async () => {
     render(<MapWorkspace configuration={configuration} />);
     await mountedMap();
-    fireEvent.click(screen.getByRole('button', { name: 'Set start point' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set route start' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Enter both latitude and longitude',
     );
@@ -872,7 +918,7 @@ describe('map workspace with a mocked renderer', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     enterCoordinates('45.764', '181');
     expect(screen.getByRole('alert')).toHaveTextContent('valid WGS84');
-    expect(screen.getByLabelText('Selected start point')).toHaveTextContent(
+    expect(screen.getByLabelText('Selected route start')).toHaveTextContent(
       '45.764000° N, 4.835700° E',
     );
     act(() => engine.markers[0]!.dragTo([181, 44]));
@@ -883,7 +929,7 @@ describe('map workspace with a mocked renderer', () => {
     render(<MapWorkspace configuration={configuration} />);
     await mountedMap();
     enterCoordinates('42.5063', '1.5218');
-    expect(screen.getByLabelText('Selected start point')).toHaveTextContent(
+    expect(screen.getByLabelText('Selected route start')).toHaveTextContent(
       '42.506300° N, 1.521800° E',
     );
   });
@@ -902,12 +948,12 @@ describe('map workspace with a mocked renderer', () => {
     expect(map.remove).toHaveBeenCalledOnce();
     expect(engine.markers.at(-1)!.point).toEqual([4.832, 45.758]);
     expect(engine.maps.at(-1)!.center).toEqual([4.832, 45.758]);
-    expect(screen.getByLabelText('Selected start point')).toHaveTextContent(
+    expect(screen.getByLabelText('Selected route start')).toHaveTextContent(
       '45.758000',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
-    expect(screen.getByLabelText('Selected start point')).toHaveTextContent(
-      'No start point selected',
+    expect(screen.getByLabelText('Selected route start')).toHaveTextContent(
+      'No route start selected',
     );
     expect(engine.markers.at(-1)!.remove).toHaveBeenCalledOnce();
   });
@@ -920,7 +966,7 @@ describe('map workspace with a mocked renderer', () => {
     );
     expect(screen.getByText('Map provider not configured')).toBeVisible();
     enterCoordinates('45.764', '4.8357');
-    expect(screen.getByLabelText('Selected start point')).toHaveTextContent(
+    expect(screen.getByLabelText('Selected route start')).toHaveTextContent(
       '45.764000',
     );
     expect(engine.maps).toHaveLength(0);
@@ -996,7 +1042,7 @@ describe('map workspace with a mocked renderer', () => {
       ),
     );
     enterCoordinates('45.764', '4.8357');
-    expect(screen.getByLabelText('Selected start point')).toHaveTextContent(
+    expect(screen.getByLabelText('Selected route start')).toHaveTextContent(
       '45.764000',
     );
   });
@@ -1016,7 +1062,7 @@ describe('map workspace with a mocked renderer', () => {
     fireEvent.click(
       await screen.findByRole('button', { name: 'Place Bellecour' }),
     );
-    expect(screen.getByLabelText('Selected start point')).toHaveTextContent(
+    expect(screen.getByLabelText('Selected route start')).toHaveTextContent(
       '45.757900° N, 4.832000° E',
     );
     expect(map.center).toEqual([4.832, 45.7579]);

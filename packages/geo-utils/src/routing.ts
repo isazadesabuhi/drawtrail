@@ -148,6 +148,9 @@ export function scoreLineSimilarity(
   normalizedError: number;
   cornerError: number;
   orderedError: number;
+  averageDeviationMeters: number;
+  p95DeviationMeters: number;
+  maximumDeviationMeters: number;
 } {
   const targetPoints = metricPoints(target, anchor);
   const routePoints = metricPoints(route, anchor);
@@ -196,24 +199,33 @@ export function scoreLineSimilarity(
     }
     previousFrechet = currentFrechet;
   }
-  const meanNearest = (
+  const nearestDistances = (
     source: readonly EastNorth[],
     destination: readonly EastNorth[],
   ) =>
-    source.reduce(
-      (sum, point) =>
-        sum +
-        Math.min(
-          ...destination.map((candidate) =>
-            Math.hypot(point[0] - candidate[0], point[1] - candidate[1]),
-          ),
+    source.map((point) =>
+      Math.min(
+        ...destination.map((candidate) =>
+          Math.hypot(point[0] - candidate[0], point[1] - candidate[1]),
         ),
-      0,
-    ) / source.length;
-  const symmetricMean =
-    (meanNearest(targetSamples, routeSamples) +
-      meanNearest(routeSamples, targetSamples)) /
-    2;
+      ),
+    );
+  const deviationSamples = [
+    ...nearestDistances(targetSamples, routeSamples),
+    ...nearestDistances(routeSamples, targetSamples),
+  ];
+  const averageDeviationMeters =
+    deviationSamples.reduce((sum, distance) => sum + distance, 0) /
+    deviationSamples.length;
+  const sortedDeviationSamples = [...deviationSamples].sort(
+    (first, second) => first - second,
+  );
+  const p95DeviationMeters =
+    sortedDeviationSamples[
+      Math.ceil(sortedDeviationSamples.length * 0.95) - 1
+    ]!;
+  const maximumDeviationMeters = sortedDeviationSamples.at(-1)!;
+  const symmetricMean = averageDeviationMeters;
   const east = targetPoints.map(([value]) => value);
   const north = targetPoints.map(([, value]) => value);
   const diagonal = Math.max(
@@ -253,6 +265,51 @@ export function scoreLineSimilarity(
     normalizedError: combinedError,
     cornerError,
     orderedError,
+    averageDeviationMeters,
+    p95DeviationMeters,
+    maximumDeviationMeters,
+  };
+}
+
+/** Return the sampled gap with the largest separation between two lines. */
+export function worstLineDeviationSegment(
+  target: GeoJSONLineString,
+  route: GeoJSONLineString,
+  anchor: LngLat,
+): GeoJSONLineString {
+  const targetPoints = metricPoints(target, anchor);
+  const routePoints = metricPoints(route, anchor);
+  const resample = (points: readonly EastNorth[]) => {
+    const distances = cumulativeLengths(points);
+    const length = distances.at(-1)!;
+    return Array.from({ length: 64 }, (_, index) =>
+      pointAtDistance(points, distances, (length * index) / 63),
+    );
+  };
+  const targetSamples = resample(targetPoints);
+  const routeSamples = resample(routePoints);
+  let maximumDistance = -1;
+  let gap: [EastNorth, EastNorth] = [targetSamples[0]!, routeSamples[0]!];
+  for (const [source, destination] of [
+    [targetSamples, routeSamples],
+    [routeSamples, targetSamples],
+  ] as const) {
+    for (const point of source) {
+      for (const candidate of destination) {
+        const distance = Math.hypot(
+          point[0] - candidate[0],
+          point[1] - candidate[1],
+        );
+        if (distance > maximumDistance) {
+          maximumDistance = distance;
+          gap = [point, candidate];
+        }
+      }
+    }
+  }
+  return {
+    type: 'LineString',
+    coordinates: gap.map((point) => unprojectEastNorth(point, anchor)),
   };
 }
 

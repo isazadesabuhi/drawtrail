@@ -141,6 +141,7 @@ export const routeGenerationRequestSchema = z
   .object({
     drawing: drawingSchema,
     center: lngLatSchema,
+    requiredWaypoint: lngLatSchema.optional(),
     mode: activityModeSchema,
     targetDistanceKm: z.number().finite().min(0.2).max(20).optional(),
     loop: z.boolean(),
@@ -154,6 +155,12 @@ export const routeGenerationRequestSchema = z
       .object({
         maxWaypoints: z.number().int().min(2).max(32),
         seed: z.string().min(1).max(120),
+        distanceFlexibilityRatio: z
+          .number()
+          .finite()
+          .min(0)
+          .max(0.2)
+          .default(0.1),
         placement: z
           .object({
             rotationDegrees: z.number().finite().min(-180).max(180),
@@ -235,6 +242,9 @@ const routeGenerationAlternativeSchema = z
       .strict(),
     distanceMeters: z.number().finite().positive(),
     similarityScore: z.number().finite().min(0).max(1),
+    averageDeviationMeters: z.number().finite().min(0).optional(),
+    p95DeviationMeters: z.number().finite().min(0).optional(),
+    maximumDeviationMeters: z.number().finite().min(0).optional(),
     retracingMeters: z.number().finite().min(0),
     score: z.number().finite(),
     waypointCount: z.number().int().min(2).max(32),
@@ -267,6 +277,9 @@ export const routeGenerationSuccessSchema = z
     distanceMeters: z.number().finite().positive(),
     requestedDistanceMeters: z.number().finite().positive().nullable(),
     similarityScore: z.number().finite().min(0).max(1),
+    averageDeviationMeters: z.number().finite().min(0).optional(),
+    p95DeviationMeters: z.number().finite().min(0).optional(),
+    maximumDeviationMeters: z.number().finite().min(0).optional(),
     retracingMeters: z.number().finite().min(0),
     waypointCount: z.number().int().min(2).max(32),
     warnings: z.array(z.string().min(1)),

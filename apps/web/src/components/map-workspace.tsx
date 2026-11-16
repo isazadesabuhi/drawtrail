@@ -10,7 +10,12 @@ import {
 } from 'react';
 import type { GeoJSONFeatureCollection, LngLat } from '@drawtrail/types';
 import { activityModeSchema } from '@drawtrail/validation';
-import { LYON_CENTER, LYON_ZOOM } from '@drawtrail/geo-utils';
+import {
+  LYON_CENTER,
+  LYON_ZOOM,
+  scoreLineSimilarity,
+  worstLineDeviationSegment,
+} from '@drawtrail/geo-utils';
 import {
   lngLatSchema,
   type RouteGenerationSuccess,
@@ -150,6 +155,35 @@ export function MapWorkspace({
   const activeRetracing =
     activeAlternative?.retracingMeters ?? routeResult?.retracingMeters;
   const activeWarnings = activeAlternative?.warnings ?? routeResult?.warnings;
+  const activeDeviation = useMemo(() => {
+    if (!activeTargetGeometry || !activeRoute) return null;
+    const anchor = searchCenter ?? activeTargetGeometry.coordinates[0];
+    if (!anchor) return null;
+    return scoreLineSimilarity(
+      activeTargetGeometry,
+      activeRoute.geometry,
+      anchor,
+    );
+  }, [activeRoute, activeTargetGeometry, searchCenter]);
+  const worstGapGeometry = useMemo(() => {
+    if (!activeTargetGeometry || !activeRoute) return EMPTY_FEATURES;
+    const anchor = searchCenter ?? activeTargetGeometry.coordinates[0];
+    if (!anchor) return EMPTY_FEATURES;
+    return {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { kind: 'worst-gap' },
+          geometry: worstLineDeviationSegment(
+            activeTargetGeometry,
+            activeRoute.geometry,
+            anchor,
+          ),
+        },
+      ],
+    } satisfies GeoJSONFeatureCollection;
+  }, [activeRoute, activeTargetGeometry, searchCenter]);
 
   const scrollTo = useCallback((element: HTMLElement | null) => {
     if (!element || typeof element.scrollIntoView !== 'function') return;
@@ -407,7 +441,9 @@ export function MapWorkspace({
           <p className="eyebrow">YOUR IDEA STARTS SOMEWHERE</p>
           <h1>
             {stage === 'place'
-              ? 'Choose a starting point.'
+              ? areaSearchMode
+                ? 'Choose a search area.'
+                : 'Choose your route start.'
               : stage === 'options'
                 ? 'Set up your route.'
                 : 'Draw your idea.'}
@@ -415,12 +451,12 @@ export function MapWorkspace({
           <p>
             {stage === 'place'
               ? areaSearchMode
-                ? 'Choose the center of your search area on the map. The route can start anywhere inside the radius you set.'
-                : 'Click the map or search for a place to choose where your route begins.'
+                ? 'Choose the center of your search area. The route can start anywhere inside the radius and must stay inside the circle.'
+                : 'Choose where the route should start. It will snap to a nearby routeable street, within 250 m.'
               : stage === 'options'
                 ? areaSearchMode
                   ? 'Choose an activity, distance, and radius. The whole route will stay inside the search circle.'
-                  : 'Choose an activity and distance. Add a search radius to find routes around your start point.'
+                  : 'Choose activity and distance. The route will start near your pin; an optional radius searches for better shape placements around it.'
                 : 'Draw a shape or choose a preset. You can generate a route without previewing first.'}
           </p>
         </div>
@@ -496,15 +532,22 @@ export function MapWorkspace({
       </ol>
       <div hidden={stage === 'draw'}>
         <div className="editor-grid">
-          <aside className="editor-sidebar" aria-label="Start point settings">
+          <aside
+            className="editor-sidebar"
+            aria-label="Route location settings"
+          >
             {stage === 'place' && (
               <section className="editor-panel" ref={placeStepRef}>
-                <p className="eyebrow">A PLACE TO BEGIN</p>
-                <h2>Set your start point</h2>
+                <p className="eyebrow">ROUTE LOCATION</p>
+                <h2>
+                  {areaSearchMode
+                    ? 'Choose an area center'
+                    : 'Set your route start'}
+                </h2>
                 <p className="panel-description">
                   {areaSearchMode
-                    ? 'Click the map to choose the center of the area. This is not the route start.'
-                    : 'Click the map or enter coordinates. Drag the orange pin to adjust it.'}
+                    ? 'Click the map to choose the center. The entire generated route must fit inside the radius.'
+                    : 'Click the map or enter coordinates to choose where the route starts. Drag the orange pin to adjust it; the nearest routeable street must be within 250 m.'}
                 </p>
                 <form onSubmit={search} role="search" className="place-search">
                   <label htmlFor="place-query">Search local places</label>
@@ -636,7 +679,7 @@ export function MapWorkspace({
                     className="primary-button set-start-button"
                     type="submit"
                   >
-                    Set start point <span aria-hidden="true">↗</span>
+                    Set route start <span aria-hidden="true">↗</span>
                   </button>
                 </form>
               </section>
@@ -652,7 +695,7 @@ export function MapWorkspace({
                 <p className="panel-description">
                   {areaSearchMode
                     ? 'Choose the essentials. DrawTrail will look for a route anywhere in the selected circle and keep the whole route inside it.'
-                    : 'Choose the essentials. The search radius tells DrawTrail where to look for a starting area; routes can extend beyond it.'}
+                    : 'Choose activity and distance. The route will start near your pin; an optional radius searches for better shape placements around it.'}
                 </p>
                 <label htmlFor="route-activity">Activity</label>
                 <select
@@ -680,7 +723,7 @@ export function MapWorkspace({
                       id="route-distance"
                       type="number"
                       min="0.5"
-                      max="100"
+                      max="20"
                       step="0.1"
                       value={routeSettings.targetDistanceKm}
                       onChange={(event) =>
@@ -690,6 +733,24 @@ export function MapWorkspace({
                         }))
                       }
                     />
+                    <label htmlFor="route-distance-flexibility">
+                      Try routes within
+                    </label>
+                    <select
+                      id="route-distance-flexibility"
+                      value={routeSettings.distanceFlexibilityPercent}
+                      onChange={(event) =>
+                        setRouteSettings((current) => ({
+                          ...current,
+                          distanceFlexibilityPercent: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="0">Exact distance only</option>
+                      <option value="5">±5% of target distance</option>
+                      <option value="10">±10% of target distance</option>
+                      <option value="20">±20% of target distance</option>
+                    </select>
                   </div>
                 )}
                 {areaSearchMode ? (
@@ -710,7 +771,7 @@ export function MapWorkspace({
                         }))
                       }
                     />
-                    Search around my starting point
+                    Search nearby shape placements
                   </label>
                 )}
                 {routeSettings.searchRadiusMeters !== null && (
@@ -718,7 +779,7 @@ export function MapWorkspace({
                     <label htmlFor="route-radius">
                       {areaSearchMode
                         ? 'Maximum route radius (km)'
-                        : 'Search radius from start (km)'}
+                        : 'Shape search radius (km)'}
                     </label>
                     <input
                       id="route-radius"
@@ -741,7 +802,7 @@ export function MapWorkspace({
                     <p className="field-hint">
                       {areaSearchMode
                         ? 'The entire generated route must stay inside the map circle.'
-                        : 'The map circle shows the search area. The route may go beyond it.'}
+                        : 'The circle limits where the drawing can be placed. The route starts at your pin and may extend beyond the circle.'}
                     </p>
                   </div>
                 )}
@@ -896,7 +957,7 @@ export function MapWorkspace({
                 <h2 id="selected-point-title">
                   {areaSearchMode
                     ? 'Search area center'
-                    : 'Your starting point'}
+                    : 'Route starting point'}
                 </h2>
                 {(startPoint || areaSearchMode) && (
                   <button
@@ -921,7 +982,7 @@ export function MapWorkspace({
               </div>
               <output
                 aria-label={
-                  areaSearchMode ? 'Search area center' : 'Selected start point'
+                  areaSearchMode ? 'Search area center' : 'Selected route start'
                 }
               >
                 {areaSearchMode
@@ -930,7 +991,7 @@ export function MapWorkspace({
                     : 'Click the map to choose the search area center.'
                   : startPoint
                     ? formatLocation(startPoint)
-                    : 'No start point selected yet.'}
+                    : 'No route start selected yet.'}
               </output>
               {startPoint && !areaSearchMode && (
                 <p className="coordinate-order">
@@ -944,7 +1005,7 @@ export function MapWorkspace({
               <p className="field-hint">
                 {areaSearchMode
                   ? 'The generated route can begin anywhere inside the radius and must stay inside it.'
-                  : 'A start point is a placement, not a validated street route.'}
+                  : 'The route starts on a routeable street within 250 m of this point. Loops return to the same street location.'}
               </p>
               {!areaSearchMode && (
                 <button
@@ -952,7 +1013,7 @@ export function MapWorkspace({
                   type="button"
                   onClick={beginAreaSearch}
                 >
-                  Find a route inside an area instead
+                  Search for a route inside an area instead
                 </button>
               )}
               {areaSearchMode && (
@@ -961,7 +1022,7 @@ export function MapWorkspace({
                   type="button"
                   onClick={chooseStartPointMode}
                 >
-                  Use a specific starting point
+                  Use a specific route start
                 </button>
               )}
             </section>
@@ -993,6 +1054,7 @@ export function MapWorkspace({
               targetGeometry={targetGeometry}
               routeGeometry={routeGeometry}
               searchAreaGeometry={searchAreaGeometry}
+              deviationGeometry={worstGapGeometry}
             />
             {(targetGeometry.features.length > 0 ||
               (searchCenter !== null &&
@@ -1009,6 +1071,10 @@ export function MapWorkspace({
                   <>
                     <span>
                       <i className="target-legend-swatch" /> Target drawing
+                    </span>
+                    <span>
+                      <i className="deviation-legend-swatch" /> Largest shape
+                      gap
                     </span>
                     <span>
                       <i className="route-legend-swatch" /> Actual street route
@@ -1062,7 +1128,7 @@ export function MapWorkspace({
                       >
                         Option {index + 1} ·{' '}
                         {(alternative.distanceMeters / 1000).toFixed(2)} km ·{' '}
-                        {Math.round(alternative.similarityScore * 100)}% match
+                        {Math.round(alternative.similarityScore * 100)}% fit
                       </button>
                     ))}
                   </div>
@@ -1101,8 +1167,23 @@ export function MapWorkspace({
                       </div>
                     )}
                     <div>
-                      <dt>Shape similarity</dt>
+                      <dt>Estimated shape fit</dt>
                       <dd>{Math.round((activeSimilarity ?? 0) * 100)}%</dd>
+                    </div>
+                    <div>
+                      <dt>Average gap from drawing</dt>
+                      <dd>
+                        {Math.round(
+                          activeDeviation?.averageDeviationMeters ?? 0,
+                        )}{' '}
+                        m
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>95th-percentile gap</dt>
+                      <dd>
+                        {Math.round(activeDeviation?.p95DeviationMeters ?? 0)} m
+                      </dd>
                     </div>
                     <div>
                       <dt>Retraced</dt>
@@ -1117,6 +1198,11 @@ export function MapWorkspace({
                       <dd>{routeResult.waypointCount}</dd>
                     </div>
                   </dl>
+                  <p className="field-hint">
+                    The fit percentage is a geometry estimate. The gap
+                    measurements show how far sampled route points are from the
+                    drawing.
+                  </p>
                   <ElevationProfile
                     key={selectedAlternativeIndex}
                     elevation={activeElevation}
@@ -1226,8 +1312,9 @@ export function MapWorkspace({
           </section>
         </div>
         <p className="editor-footer-note">
-          Your start point stays here while switching stages. Drawing drafts are
-          saved on this device; the map location is not saved across reloads.
+          Your chosen route location stays here while switching stages. Drawing
+          drafts are saved on this device; the route location is not saved
+          across reloads.
         </p>
       </div>
       <div

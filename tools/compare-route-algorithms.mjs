@@ -96,6 +96,7 @@ for (const [neighborhoodIndex, center] of region.centers.entries()) {
         closed: shape !== 'letter',
       };
       body.center = center;
+      body.requiredWaypoint = center;
       body.mode = mode;
       body.targetDistanceKm = 3;
       body.loop = shape !== 'letter';
@@ -125,6 +126,9 @@ for (const [neighborhoodIndex, center] of region.centers.entries()) {
         status: result?.status ?? 'invalid_response',
         distanceMeters: generation?.distanceMeters ?? null,
         similarityScore: generation?.similarityScore ?? null,
+        averageDeviationMeters: generation?.averageDeviationMeters ?? null,
+        p95DeviationMeters: generation?.p95DeviationMeters ?? null,
+        maximumDeviationMeters: generation?.maximumDeviationMeters ?? null,
         retracingMeters: generation?.retracingMeters ?? null,
         routerPlacements: generation?.alternatives?.length ?? 0,
         errorCode: result?.error?.code ?? null,

@@ -5,6 +5,7 @@ import {
   measureRetracing,
   sampleOrderedWaypoints,
   scoreLineSimilarity,
+  worstLineDeviationSegment,
 } from './routing';
 
 const anchor: LngLat = [4.8357, 45.764];
@@ -60,7 +61,13 @@ describe('routing geometry utilities', () => {
     const distortedScore = scoreLineSimilarity(lShape, distorted, anchor);
     expect(identicalScore.score).toBeCloseTo(1);
     expect(identicalScore.normalizedError).toBeCloseTo(0);
+    expect(identicalScore.averageDeviationMeters).toBeCloseTo(0);
+    expect(identicalScore.p95DeviationMeters).toBeCloseTo(0);
+    expect(identicalScore.maximumDeviationMeters).toBeCloseTo(0);
     expect(distortedScore.score).toBeLessThan(identicalScore.score);
+    expect(distortedScore.maximumDeviationMeters).toBeGreaterThan(
+      distortedScore.averageDeviationMeters,
+    );
   });
 
   it('penalizes a shortcut that misses a salient corner', () => {
@@ -83,6 +90,16 @@ describe('routing geometry utilities', () => {
     expect(ordered.score).toBeCloseTo(1);
     expect(outOfOrder.orderedError).toBeGreaterThan(0.2);
     expect(outOfOrder.score).toBeLessThan(ordered.score);
+  });
+
+  it('locates the largest sampled gap between the sketch and route', () => {
+    const gap = worstLineDeviationSegment(
+      lShape,
+      { type: 'LineString', coordinates: [anchor, top] },
+      anchor,
+    );
+    expect(gap.coordinates).toHaveLength(2);
+    expect(lineLengthMeters(gap, anchor)).toBeGreaterThan(50);
   });
 
   it('detects a repeated out-and-back segment and keeps a single loop low', () => {

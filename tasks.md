@@ -937,6 +937,64 @@ Related work is already tracked: elevation profiles and ascent/descent in 14-05;
 
 **Acceptance:** Thresholds are visible; isolated spikes and missing-data gaps do not become steep sections; tests cover climbs, descents, short spikes, and partial data.
 
+## Phase 16 — Shape-match quality improvements (P2)
+
+Added at the user's request on 2026-11-16 after auditing route generation, score interpretation, pinned-start behavior, and area search. This work improves how requests are explained, routes are constrained and ranked, shape misses are refined, and result quality is reported. Original phases and IDs remain unchanged.
+
+### [x] 16-01 — Clarify pinned-start and area-search modes
+
+**Scope:** Explain the role of a pinned route start, nearby placement search, and area-only search in the workspace.
+
+**Acceptance:** Labels identify the pinned route start and area center separately; radius hints say whether the whole route must remain inside the circle; tests cover both modes.
+
+### [x] 16-02 — Route through the pinned start
+
+**Scope:** Begin pinned routes at the selected map point snapped to an accessible street; close loops back to that street location. Keep area-only search free to choose its own start.
+
+**Acceptance:** The routed geometry starts within 250 m of the pin, loops return within the continuity tolerance, too-distant snaps fail clearly, and area-only requests omit the required waypoint.
+
+### [x] 16-03 — Offer nearby-distance route alternatives
+
+**Scope:** Treat a requested distance as a preference with exact, ±5%, ±10%, and ±20% choices. Compare shape sizes around the target and retain distinct shorter/longer route options.
+
+**Acceptance:** Measured alternatives are returned on both sides of the target when viable; a hard distance limit remains enforced; UI and validation agree on supported distances.
+
+### [x] 16-04 — Adaptively refine the largest shape misses
+
+**Scope:** Measure route-to-drawing gaps, add up to four separated waypoints at the largest local deviation peaks, and reroute promising routes within existing search budgets.
+
+**Acceptance:** A fixture with a missed bend gains a waypoint and improves its fit; disconnected, cancelled, or budget-limited routes remain typed and bounded.
+
+### [x] 16-05 — Show absolute route-shape gaps
+
+**Scope:** Report average and 95th-percentile gap in metres alongside an explicitly estimated fit score, and mark the largest sampled gap on the map.
+
+**Acceptance:** Identical routes report zero gaps; alternatives update their measurements and map overlay; saved and older route records remain readable.
+
+### [x] 16-06 — Expand and refine radius search
+
+**Scope:** Search up to sixteen deterministic placements with a coarse waypoint pass, reroute the leading candidates with full detail, and report viable candidates and exhausted budgets.
+
+**Acceptance:** Both radius modes use bounded candidate and runtime limits; leading placements are rerouted when budget allows; warnings distinguish sampled results from exhaustive search.
+
+### [x] 16-07 — Record real-route quality benchmark metrics
+
+**Scope:** Extend the opt-in Lyon/Andorra benchmark and integration smoke output with pinned-start distance and absolute shape-gap metrics.
+
+**Acceptance:** The benchmark report records elapsed time, actual distance, fit estimate, average/p95/maximum gaps, retracing, and alternatives.
+
+### [ ] 16-08 — Run the real-route quality benchmark
+
+**Scope:** Run the generation integration smoke and multi-shape benchmark against a fixed local Valhalla graph and record the results.
+
+**Acceptance:** Both pinned-start and area-only behavior are verified against the graph; benchmark output is reviewed for route quality, budget use, and distance trade-offs.
+
+### [x] 16-09 — Document current search and score behavior
+
+**Scope:** Keep generation guidance, scoring formulas, user-facing score limits, and task evidence aligned with the implementation.
+
+**Acceptance:** Docs state the pin snap limit, distance flexibility, candidate/refinement limits, gap metrics, deduplication behavior, and benchmark status.
+
 ## Dependencies and changes
 
 - Implement phases 00–06 sequentially unless a specific task has no dependency. Within a phase, each task depends on the preceding relevant foundation, not necessarily every other task.
@@ -970,7 +1028,7 @@ After the first task, replace **00-01** with the next chosen task ID.
 
 ## Living task registry
 
-Updated 2026-11-07. Work resumed at the user's request, phase by phase with tests. On Windows, TASKS.md and tasks.md refer to this same file. Original IDs and acceptance criteria are preserved.
+Updated 2026-11-16. Work resumed at the user's request, phase by phase with tests. On Windows, TASKS.md and tasks.md refer to this same file. Original IDs and acceptance criteria are preserved.
 
 Phase 00 documentation was reviewed against each acceptance criterion. Registry integrity is checked with `node tools/check-backlog.mjs`. Phase 01 passed local installation, formatting, lint, typecheck, unit/component tests, build, and desktop/mobile smoke. Hosted CI execution remains in review (01-10). Dependencies for future phases remain as documented above and will be refined when their phase begins.
 
@@ -1127,7 +1185,23 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 | 15-03 | done   | 06-06, 09-02        | Activity-specific pace/speed, selected-alternative estimates, invalid-rate handling, and walking/running/cycling conversion tests pass; full `npm run check` passed (211 tests and production build).  |
 | 15-04 | done   | 14-05               | Sustained 8% grade sections over 60 m are shown from elevation samples; missing data and spikes are handled; full `npm run check` passed (225 tests and production build).                             |
 
+### Shape-match improvement registry
+
+| ID    | Status      | Dependencies        | Evidence / next action                                                                                                                                                                                                        |
+| ----- | ----------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 16-01 | done        | 09-02               | Workspace copy and controls distinguish pinned start, placement radius, and area-only search; component tests cover both modes.                                                                                               |
+| 16-02 | done        | 05-04, 06-01, 07-03 | Pinned routes start and close within 250 m of the selected street point; distant snaps fail; generator and workspace tests pass.                                                                                              |
+| 16-03 | done        | 07-02, 07-05        | Exact/±5/±10/±20 distance flexibility, shorter/longer alternatives, and 20 km UI/API limit alignment are covered by generator, validation, and workspace tests.                                                               |
+| 16-04 | done        | 06-02, 07-04        | Largest separated geometry gaps add up to four ordered waypoints; missed-bend fixture improves after rerouting.                                                                                                               |
+| 16-05 | done        | 16-04               | API and UI report average/p95/max gaps; map connector identifies the largest sampled gap; identical/deformed geometry tests pass.                                                                                             |
+| 16-06 | done        | 07-09, 07-10, 16-04 | Radius searches test up to 16 placements coarsely and reroute leading candidates with full detail; request/runtime warnings and tests pass.                                                                                   |
+| 16-07 | done        | 16-05               | Integration and comparison scripts now record pinned-start distance and average/p95/max shape gaps, fit estimate, distance, elapsed time, retracing, and alternatives.                                                        |
+| 16-08 | in progress | 16-07               | Live integration and multi-shape benchmark not run: no local web server or Valhalla endpoint is available. Start both, run `npm run test:generation:integration` and `npm run bench:generation:compare`, then attach results. |
+| 16-09 | done        | 16-01–16-07         | Generation guide and algorithm metric formulas/limits updated; deterministic tests, typecheck, lint, and docs registry pass.                                                                                                  |
+
 ### Decisions and changes
+
+- 2026-11-16: Completed 16-01 through 16-07 and 16-09. Pinned routes now start/close near the selected street; distance flexibility, adaptive shape refinement, absolute gap metrics, a largest-gap map overlay, and bounded radius candidate refinement are implemented. Full `npm.cmd run check` passed: 257 tests and production build. Live routing benchmark 16-08 remains open because Docker, Valhalla, and the local web server were unavailable in this environment. See docs/progress/phase-16-shape-match-improvements.md.
 
 - 2026-11-10: Completed 09-07. Added a downloadable PNG route card with selected geometry, route stats, escaped title, and OSM attribution. It does not receive the private sketch. Full `npm run check` passed: 239 tests and production build. See docs/progress/phase-09-07-shareable-route-image.md.
 

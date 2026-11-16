@@ -20,11 +20,13 @@ interface MapCanvasProps {
   targetGeometry: GeoJSONFeatureCollection;
   routeGeometry: GeoJSONFeatureCollection;
   searchAreaGeometry: GeoJSONFeatureCollection;
+  deviationGeometry?: GeoJSONFeatureCollection;
 }
 
 const TARGET_SOURCE = 'drawtrail-target-geometry';
 const ROUTE_SOURCE = 'drawtrail-route-geometry';
 const SEARCH_AREA_SOURCE = 'drawtrail-search-area';
+const DEVIATION_SOURCE = 'drawtrail-worst-gap';
 
 function mutableGeoJSON(data: GeoJSONFeatureCollection) {
   return JSON.parse(JSON.stringify(data)) as Parameters<
@@ -40,6 +42,10 @@ export function MapCanvas({
   targetGeometry,
   routeGeometry,
   searchAreaGeometry,
+  deviationGeometry = {
+    type: 'FeatureCollection',
+    features: [],
+  },
 }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LibreMap | null>(null);
@@ -49,6 +55,7 @@ export function MapCanvas({
   const targetGeometryRef = useRef(targetGeometry);
   const routeGeometryRef = useRef(routeGeometry);
   const searchAreaGeometryRef = useRef(searchAreaGeometry);
+  const deviationGeometryRef = useRef(deviationGeometry);
   const syncMarkerRef = useRef<(() => void) | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
@@ -139,6 +146,10 @@ export function MapCanvas({
             type: 'geojson',
             data: mutableGeoJSON(searchAreaGeometryRef.current),
           });
+          map?.addSource(DEVIATION_SOURCE, {
+            type: 'geojson',
+            data: mutableGeoJSON(deviationGeometryRef.current),
+          });
           map?.addLayer({
             id: 'drawtrail-search-area-line',
             type: 'line',
@@ -166,6 +177,17 @@ export function MapCanvas({
             source: TARGET_SOURCE,
             paint: { 'line-color': '#d27143', 'line-width': 4 },
             layout: { 'line-cap': 'round', 'line-join': 'round' },
+          });
+          map?.addLayer({
+            id: 'drawtrail-worst-gap-line',
+            type: 'line',
+            source: DEVIATION_SOURCE,
+            paint: {
+              'line-color': '#a94d66',
+              'line-width': 2,
+              'line-dasharray': [1, 1],
+            },
+            layout: { 'line-cap': 'round' },
           });
           if (viewRef.current.bounds) {
             map?.fitBounds(viewRef.current.bounds, {
@@ -282,6 +304,13 @@ export function MapCanvas({
       ?.getSource<GeoJSONSource>(SEARCH_AREA_SOURCE)
       ?.setData(mutableGeoJSON(searchAreaGeometry));
   }, [searchAreaGeometry]);
+
+  useEffect(() => {
+    deviationGeometryRef.current = deviationGeometry;
+    mapRef.current
+      ?.getSource<GeoJSONSource>(DEVIATION_SOURCE)
+      ?.setData(mutableGeoJSON(deviationGeometry));
+  }, [deviationGeometry]);
 
   const unconfigured = configuration.mode === 'unconfigured';
   return (

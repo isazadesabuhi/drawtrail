@@ -4,6 +4,7 @@ import type { RoutePreferences } from '@drawtrail/validation';
 export type RouteSettings = {
   mode: ActivityMode;
   targetDistanceKm: string;
+  distanceFlexibilityPercent: string;
   bestShapeMatch: boolean;
   searchRadiusMeters: number | null;
   closeLoop: boolean;
@@ -16,6 +17,7 @@ export type RouteSettings = {
 export const DEFAULT_ROUTE_SETTINGS: RouteSettings = {
   mode: 'walking',
   targetDistanceKm: '3',
+  distanceFlexibilityPercent: '10',
   bestShapeMatch: false,
   searchRadiusMeters: null,
   closeLoop: false,
