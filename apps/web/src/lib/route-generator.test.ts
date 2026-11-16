@@ -112,6 +112,28 @@ describe('route generator', () => {
     expect(firstRequest[1]).toEqual(result.targetGeometry.coordinates[0]);
   });
 
+  it('rejects an exact-distance request when the routed street distance is much longer', async () => {
+    const request = await readRequest();
+    request.settings.distanceFlexibilityRatio = 0;
+    request.settings.searchArea = { radiusMeters: 10_000, candidateCount: 2 };
+    const longRoute: RouteSegmenter = async (mode, from, to) => {
+      const geometry = { type: 'LineString' as const, coordinates: [from, to] };
+      return {
+        mode,
+        geometry,
+        distanceMeters: lineLengthMeters(geometry, anchor) * 2,
+      };
+    };
+
+    const result = await generateRoute(request, longRoute);
+
+    expect(result).toMatchObject({
+      status: 'error',
+      code: 'no_route',
+      message: expect.stringContaining('outside the allowed 25% range'),
+    });
+  });
+
   it('starts at a required map waypoint and closes loops back to that waypoint', async () => {
     const request = await readRequest();
     request.bounds.radiusMeters = 25_000;
@@ -529,9 +551,7 @@ describe('route generator', () => {
     await expect(generateRoute(request, router)).resolves.toMatchObject({
       status: 'error',
       code: 'no_route',
-      message: expect.stringContaining(
-        'configured 10% distance-deviation limit',
-      ),
+      message: expect.stringContaining('outside the allowed 10% range'),
     });
   });
 

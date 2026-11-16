@@ -751,6 +751,13 @@ export function MapWorkspace({
                       <option value="10">±10% of target distance</option>
                       <option value="20">±20% of target distance</option>
                     </select>
+                    {routeSettings.searchRadiusMeters !== null && (
+                      <p className="field-hint">
+                        Street routing can change the final distance. Routes
+                        more than 25% from the target are rejected unless you
+                        set another maximum in advanced options.
+                      </p>
+                    )}
                   </div>
                 )}
                 {areaSearchMode ? (

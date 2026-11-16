@@ -471,6 +471,20 @@ async function generateSingleRoute(
     request.targetDistanceKm === undefined
       ? null
       : request.targetDistanceKm * 1000;
+  const allowedDistanceDeviationRatio =
+    request.settings.searchArea?.maxDistanceDeviationRatio ??
+    Math.max(0.25, request.settings.distanceFlexibilityRatio);
+  if (
+    request.settings.searchArea &&
+    requestedDistanceMeters !== null &&
+    Math.abs(distance - requestedDistanceMeters) / requestedDistanceMeters >
+      allowedDistanceDeviationRatio
+  ) {
+    return failure(
+      'no_route',
+      `The routed distance (${(distance / 1000).toFixed(2)} km) is outside the allowed ${Math.round(allowedDistanceDeviationRatio * 100)}% range around the ${(requestedDistanceMeters / 1000).toFixed(2)} km target.`,
+    );
+  }
   const warnings: string[] = [];
   if (
     requestedDistanceMeters !== null &&
