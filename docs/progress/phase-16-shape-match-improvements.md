@@ -22,6 +22,8 @@ Date: 2026-11-16
 - Next.js production build
 - `git diff --check`
 
+After the initial implementation, area search was broadened in response to lower observed fit scores: it now samples up to 48 placements and gives up to eight leading placements detailed waypoint refinement. Workspace search budgets allow up to 512 routing calls and 60 seconds. Validation enforces the 48-placement cap.
+
 The real-route benchmark remains open as task 16-08. It could not run in this environment because there was no reachable Docker daemon, Valhalla endpoint at `127.0.0.1:8002`, or local web server at `127.0.0.1:3000`. Run `npm.cmd run test:generation:integration` and `npm.cmd run bench:generation:compare` with those services running to complete it.
 
 The fit and gap metrics are geometry-based estimates over sampled lines. The candidate search is bounded, so the highest-ranked result is the best among placements the search evaluated, not a guarantee of a globally optimal route.

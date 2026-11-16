@@ -304,10 +304,10 @@ function DrawingSession({
               : {
                   searchArea: {
                     radiusMeters: routeSettings.searchRadiusMeters,
-                    candidateCount: 16,
+                    candidateCount: 48,
                     ...(areaOnly ? { routeWithinRadius: true } : {}),
-                    maxRuntimeMs: 30_000,
-                    maxRouterRequests: 160,
+                    maxRuntimeMs: 60_000,
+                    maxRouterRequests: 512,
                     ...(routeSettings.maxDistanceDeviationPercent === null ||
                     routeSettings.bestShapeMatch
                       ? {}

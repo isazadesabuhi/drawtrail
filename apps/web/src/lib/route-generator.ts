@@ -843,7 +843,10 @@ export async function generateRoute(
         second.score - first.score ||
         first.result.distanceMeters - second.result.distanceMeters,
     );
-    for (const item of ranked.slice(0, 3)) {
+    // The coarse pass can mis-rank candidates whose bends need more waypoints.
+    // Spend detailed routing on a wider shortlist before selecting alternatives.
+    const refinementCount = searchArea ? Math.min(8, ranked.length) : 3;
+    for (const item of ranked.slice(0, refinementCount)) {
       if (routerRequests >= maxRouterRequests) {
         budgetMessage = `Search stopped at its ${maxRouterRequests}-request routing limit.`;
         break;

@@ -324,7 +324,7 @@ describe('map workspace with a mocked renderer', () => {
         distanceFlexibilityRatio: 0.1,
         searchArea: {
           radiusMeters: 5000,
-          candidateCount: 16,
+          candidateCount: 48,
           routeWithinRadius: true,
         },
       },
@@ -730,10 +730,10 @@ describe('map workspace with a mocked renderer', () => {
         distanceFlexibilityRatio: 0.2,
         searchArea: {
           radiusMeters: 2000,
-          candidateCount: 16,
+          candidateCount: 48,
           maxDistanceDeviationRatio: 0.4,
-          maxRuntimeMs: 30000,
-          maxRouterRequests: 160,
+          maxRuntimeMs: 60000,
+          maxRouterRequests: 512,
         },
       },
     });

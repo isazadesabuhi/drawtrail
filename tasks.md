@@ -973,7 +973,7 @@ Added at the user's request on 2026-11-16 after auditing route generation, score
 
 ### [x] 16-06 — Expand and refine radius search
 
-**Scope:** Search up to sixteen deterministic placements with a coarse waypoint pass, reroute the leading candidates with full detail, and report viable candidates and exhausted budgets.
+**Scope:** Search up to forty-eight deterministic placements with a coarse waypoint pass, reroute the leading candidates with full detail, and report viable candidates and exhausted budgets.
 
 **Acceptance:** Both radius modes use bounded candidate and runtime limits; leading placements are rerouted when budget allows; warnings distinguish sampled results from exhaustive search.
 
@@ -1194,7 +1194,7 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 | 16-03 | done        | 07-02, 07-05        | Exact/±5/±10/±20 distance flexibility, shorter/longer alternatives, and 20 km UI/API limit alignment are covered by generator, validation, and workspace tests.                                                               |
 | 16-04 | done        | 06-02, 07-04        | Largest separated geometry gaps add up to four ordered waypoints; missed-bend fixture improves after rerouting.                                                                                                               |
 | 16-05 | done        | 16-04               | API and UI report average/p95/max gaps; map connector identifies the largest sampled gap; identical/deformed geometry tests pass.                                                                                             |
-| 16-06 | done        | 07-09, 07-10, 16-04 | Radius searches test up to 16 placements coarsely and reroute leading candidates with full detail; request/runtime warnings and tests pass.                                                                                   |
+| 16-06 | done        | 07-09, 07-10, 16-04 | Radius searches test up to 48 placements coarsely and reroute up to eight leaders with full detail; request/runtime warnings and tests pass.                                                                                  |
 | 16-07 | done        | 16-05               | Integration and comparison scripts now record pinned-start distance and average/p95/max shape gaps, fit estimate, distance, elapsed time, retracing, and alternatives.                                                        |
 | 16-08 | in progress | 16-07               | Live integration and multi-shape benchmark not run: no local web server or Valhalla endpoint is available. Start both, run `npm run test:generation:integration` and `npm run bench:generation:compare`, then attach results. |
 | 16-09 | done        | 16-01–16-07         | Generation guide and algorithm metric formulas/limits updated; deterministic tests, typecheck, lint, and docs registry pass.                                                                                                  |
@@ -1202,6 +1202,7 @@ Phase 00 documentation was reviewed against each acceptance criterion. Registry 
 ### Decisions and changes
 
 - 2026-11-16: Completed 16-01 through 16-07 and 16-09. Pinned routes now start/close near the selected street; distance flexibility, adaptive shape refinement, absolute gap metrics, a largest-gap map overlay, and bounded radius candidate refinement are implemented. Full `npm.cmd run check` passed: 257 tests and production build. Live routing benchmark 16-08 remains open because Docker, Valhalla, and the local web server were unavailable in this environment. See docs/progress/phase-16-shape-match-improvements.md.
+- 2026-11-16: Broadened area search after user reported worse shape matches: up to 48 deterministic placements and eight full-detail refinements, with workspace limits raised to 512 routing calls and 60 seconds. Targeted and full checks pending. Live quality comparison still requires local Valhalla and app services.
 
 - 2026-11-10: Completed 09-07. Added a downloadable PNG route card with selected geometry, route stats, escaped title, and OSM attribution. It does not receive the private sketch. Full `npm run check` passed: 239 tests and production build. See docs/progress/phase-09-07-shareable-route-image.md.
 

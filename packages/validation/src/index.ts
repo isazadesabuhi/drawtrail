@@ -173,7 +173,7 @@ export const routeGenerationRequestSchema = z
         searchArea: z
           .object({
             radiusMeters: z.number().finite().min(250).max(25_000),
-            candidateCount: z.number().int().min(2).max(16),
+            candidateCount: z.number().int().min(2).max(48),
             routeWithinRadius: z.boolean().optional(),
             maxDistanceDeviationRatio: z
               .number()

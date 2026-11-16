@@ -39,6 +39,31 @@ describe('route generation contracts', () => {
     ).toBe(false);
   });
 
+  it('allows broader bounded area searches up to 48 placements', async () => {
+    const fixture = routeGenerationRequestSchema.parse(
+      await readFixture('generator-request.json'),
+    );
+    const searchRequest = {
+      ...fixture,
+      settings: {
+        ...fixture.settings,
+        searchArea: { radiusMeters: 20_000, candidateCount: 48 },
+      },
+    };
+    expect(
+      routeGenerationRequestSchema.parse(searchRequest).settings.searchArea,
+    ).toMatchObject({ candidateCount: 48 });
+    expect(
+      routeGenerationRequestSchema.safeParse({
+        ...searchRequest,
+        settings: {
+          ...searchRequest.settings,
+          searchArea: { radiusMeters: 20_000, candidateCount: 49 },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it('validates route preferences while accepting older requests without them', async () => {
     const request = routeGenerationRequestSchema.parse(
       await readFixture('generator-request.json'),
